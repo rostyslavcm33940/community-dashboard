@@ -6,6 +6,8 @@ import { BarList } from "@/components/charts/BarList";
 import { ItemList } from "@/components/charts/ItemList";
 import { Heatmap } from "@/components/charts/Heatmap";
 import { CsvUploadCard } from "@/components/CsvUploadCard";
+import { ReviewList } from "@/components/ReviewList";
+import { StackedBarChart } from "@/components/charts/StackedBarChart";
 import { getLatestInsights } from "@/lib/getInsights";
 import { getDashboardStats } from "@/lib/getStats";
 import {
@@ -17,6 +19,9 @@ import {
   Lightbulb,
   MessagesSquare,
   Gamepad2,
+  Star,
+  ThumbsUp,
+  ThumbsDown,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -105,6 +110,7 @@ export default async function Dashboard() {
   const live = stats && stats.discord.members > 0;
   const d = stats?.discord;
   const s = stats?.steam;
+  const r = stats?.reviews ?? null;
   const fmtNum = (n: number) => n.toLocaleString("en-US").replace(/,/g, " ");
 
   return (
@@ -313,6 +319,35 @@ export default async function Dashboard() {
             </Card>
           </div>
         </section>
+
+        {r && (
+          <section>
+            <SectionHeader icon={Star} title="Steam Reviews (Demo)" />
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <KpiCard label="Total reviews" value={fmtNum(r.total)} delta={r.scoreDesc} trend="flat" icon={Star} />
+              <KpiCard label="Positive" value={fmtNum(r.positive)} delta={`${r.positivePct}%`} trend="up" icon={ThumbsUp} />
+              <KpiCard label="Negative" value={fmtNum(r.negative)} delta={`${100 - r.positivePct}%`} trend="down" icon={ThumbsDown} />
+              <KpiCard label="Bug mentions (7d)" value={fmtNum(r.bugMentions7d)} delta={`${r.bugMentionsAll} all-time`} trend={r.bugMentions7d > 0 ? "down" : "flat"} icon={Bug} />
+              <KpiCard label="Score" value={r.scoreDesc} delta="live" trend="flat" icon={Star} />
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card title="Reviews per day" hint="last 90 days, stacked">
+                <StackedBarChart data={r.perDay} />
+              </Card>
+              <Card title="Bug-mention reviews" hint={`${r.bugMentionsAll} total · keyword scan`}>
+                <ReviewList rows={r.lastBugMentions} kind="bug" />
+              </Card>
+
+              <Card title="Last 5 positive" hint="newest first">
+                <ReviewList rows={r.lastPositive} kind="positive" />
+              </Card>
+              <Card title="Last 5 negative" hint="newest first">
+                <ReviewList rows={r.lastNegative} kind="negative" />
+              </Card>
+            </div>
+          </section>
+        )}
 
         <footer className="text-center text-xs text-zinc-600 pt-8 pb-4">
           MVP scaffold · data is mocked · v0.2

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "once": "node scrape.js"
+    "once": "node scrape.js",
+    "reviews": "node reviews.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

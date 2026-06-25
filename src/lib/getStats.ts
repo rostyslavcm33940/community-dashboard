@@ -32,6 +32,29 @@ export type DashboardStats = {
     pinned: { title: string; replies: number; author: string }[];
     subForumSplit: { name: string; value: number }[];
   };
+  reviews: {
+    total: number;
+    positive: number;
+    negative: number;
+    positivePct: number;
+    scoreDesc: string;
+    bugMentions7d: number;
+    bugMentionsAll: number;
+    lastPositive: ReviewRow[];
+    lastNegative: ReviewRow[];
+    lastBugMentions: ReviewRow[];
+    perDay: { date: string; positive: number; negative: number }[];
+  } | null;
+};
+
+export type ReviewRow = {
+  snippet: string;
+  language: string;
+  votedUp: boolean;
+  at: string;
+  url: string;
+  translateUrl: string;
+  mentionsBug: boolean;
 };
 
 function fmt(d: Date) {
@@ -72,6 +95,11 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       { data: lastComments },
       { data: pinnedThreads },
       { data: presenceLatest },
+      { data: reviewSummary },
+      { data: lastPositive },
+      { data: lastNegative },
+      { data: lastBugMentions },
+      { data: reviewsForGraph },
     ] = await Promise.all([
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).is("left_at", null),
       supabase.from("discord_messages").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("created_at", d30),
@@ -88,6 +116,11 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       supabase.from("steam_comments").select("content, author, created_at, is_dev_reply").eq("project_id", 1).order("created_at", { ascending: false }).limit(5),
       supabase.from("steam_threads").select("title, reply_count, author").eq("project_id", 1).eq("is_pinned", true),
       supabase.from("discord_presence_snapshots").select("online_count, taken_at").eq("project_id", 1).order("taken_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("steam_review_summary").select("*").eq("project_id", 1).maybeSingle(),
+      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug").eq("project_id", 1).eq("voted_up", true).order("timestamp_created", { ascending: false }).limit(5),
+      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug").eq("project_id", 1).eq("voted_up", false).order("timestamp_created", { ascending: false }).limit(5),
+      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug").eq("project_id", 1).eq("mentions_bug", true).order("timestamp_created", { ascending: false }).limit(5),
+      supabase.from("steam_reviews").select("timestamp_created, voted_up, mentions_bug").eq("project_id", 1).gte("timestamp_created", new Date(now.getTime() - 90 * 86400_000).toISOString()),
     ]);
 
     const byChannel: Record<string, number> = {};
@@ -201,8 +234,68 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
 
+    function reviewRow(r: { content?: string | null; language?: string | null; voted_up?: boolean | null; timestamp_created?: string | null; review_url?: string | null; mentions_bug?: boolean | null }): ReviewRow {
+      const txt = (r.content ?? "").trim();
+      return {
+        snippet: txt.slice(0, 240) || "(no text)",
+        language: r.language ?? "unknown",
+        votedUp: !!r.voted_up,
+        at: shortDate(r.timestamp_created),
+        url: r.review_url ?? "",
+        translateUrl: `https://translate.google.com/?sl=auto&tl=en&op=translate&text=${encodeURIComponent(txt.slice(0, 1000))}`,
+        mentionsBug: !!r.mentions_bug,
+      };
+    }
+
+    let reviewsBlock: DashboardStats["reviews"] = null;
+    if (reviewSummary) {
+      const summary = reviewSummary as { total_reviews?: number | null; total_positive?: number | null; total_negative?: number | null; review_score_desc?: string | null };
+      const positive = summary.total_positive ?? 0;
+      const negative = summary.total_negative ?? 0;
+      const total = summary.total_reviews ?? positive + negative;
+      const positivePct = total > 0 ? Math.round((positive / total) * 100) : 0;
+
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 86400_000).getTime();
+      let bugMentions7d = 0;
+      let bugMentionsAll = 0;
+      const dayBucket: Record<string, { positive: number; negative: number }> = {};
+      for (let i = 89; i >= 0; i--) {
+        const dd = new Date(now.getTime() - i * 86400_000);
+        dayBucket[fmt(dd)] = { positive: 0, negative: 0 };
+      }
+      for (const r of (reviewsForGraph ?? []) as { timestamp_created: string; voted_up: boolean; mentions_bug: boolean }[]) {
+        if (!r.timestamp_created) continue;
+        const created = new Date(r.timestamp_created);
+        const key = fmt(created);
+        if (key in dayBucket) {
+          if (r.voted_up) dayBucket[key].positive++;
+          else dayBucket[key].negative++;
+        }
+        if (r.mentions_bug) {
+          bugMentionsAll++;
+          if (created.getTime() >= sevenDaysAgo) bugMentions7d++;
+        }
+      }
+      const perDay = Object.entries(dayBucket).map(([date, v]) => ({ date, positive: v.positive, negative: v.negative }));
+
+      reviewsBlock = {
+        total,
+        positive,
+        negative,
+        positivePct,
+        scoreDesc: summary.review_score_desc ?? "—",
+        bugMentions7d,
+        bugMentionsAll,
+        lastPositive: (lastPositive ?? []).map(reviewRow),
+        lastNegative: (lastNegative ?? []).map(reviewRow),
+        lastBugMentions: (lastBugMentions ?? []).map(reviewRow),
+        perDay,
+      };
+    }
+
     return {
       hasDb: true,
+      reviews: reviewsBlock,
       discord: {
         members: members ?? 0,
         online: (presenceLatest as { online_count?: number | null } | null)?.online_count ?? null,
