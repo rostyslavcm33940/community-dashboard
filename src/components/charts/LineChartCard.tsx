@@ -53,6 +53,7 @@ export function LineChartCard({
           strokeWidth={2}
           dot={false}
           activeDot={{ r: 4, fill: color }}
+          isAnimationActive={false}
         />
       </LineChart>
     </ResponsiveContainer>

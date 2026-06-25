@@ -22,6 +22,7 @@ export function PieChartCard({
           innerRadius={40}
           outerRadius={70}
           paddingAngle={2}
+          isAnimationActive={false}
         >
           {filtered.map((_, i) => (
             <Cell key={i} fill={PALETTE[i % PALETTE.length]} stroke="#0a0a0a" />

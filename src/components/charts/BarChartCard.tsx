@@ -57,7 +57,7 @@ export function BarChartCard({
             itemStyle={{ color: "#e4e4e7" }}
             cursor={{ fill: "#27272a" }}
           />
-          <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} />
+          <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
     );
@@ -91,7 +91,7 @@ export function BarChartCard({
           itemStyle={{ color: "#e4e4e7" }}
           cursor={{ fill: "#27272a" }}
         />
-        <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} isAnimationActive={false} />
       </BarChart>
     </ResponsiveContainer>
   );
