@@ -9,6 +9,20 @@ import { CsvUploadCard } from "@/components/CsvUploadCard";
 import { getLatestInsights } from "@/lib/getInsights";
 import { getDashboardStats } from "@/lib/getStats";
 import {
+  Users,
+  Wifi,
+  MessageSquare,
+  UserPlus,
+  Bug,
+  Lightbulb,
+  MessagesSquare,
+  Gamepad2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  RefreshCw,
+} from "lucide-react";
+import {
   discordNewMembersPerDay,
   discordMessagesPerDay,
   discordNewBugsPerWeek,
@@ -33,38 +47,45 @@ import {
 
 export const dynamic = "force-dynamic";
 
+import type { LucideIcon } from "lucide-react";
+
 type KPI = {
   label: string;
   value: string | number;
   delta?: string;
   trend?: "up" | "down" | "flat";
+  icon?: LucideIcon;
 };
 
-function KpiCard({ label, value, delta, trend }: KPI) {
+function KpiCard({ label, value, delta, trend, icon: Icon }: KPI) {
   const trendColor =
     trend === "up"
       ? "text-emerald-400"
       : trend === "down"
       ? "text-rose-400"
       : "text-zinc-400";
-  const arrow = trend === "up" ? "↑" : trend === "down" ? "↓" : "→";
+  const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className="mt-2 text-3xl font-semibold text-zinc-100">{value}</div>
+    <div className="group rounded-xl border border-zinc-800/80 bg-zinc-900/60 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.4)] transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-900/80 hover:shadow-[0_4px_16px_rgba(0,0,0,0.5)] focus-within:ring-2 focus-within:ring-emerald-500/40 motion-reduce:transition-none">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
+        {Icon && <Icon className="size-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" aria-hidden />}
+      </div>
+      <div className="mt-2 text-3xl font-semibold text-zinc-100 tabular-nums">{value}</div>
       {delta && (
-        <div className={`mt-1 text-sm ${trendColor}`}>
-          {arrow} {delta}
+        <div className={`mt-1 flex items-center gap-1 text-sm ${trendColor}`}>
+          <TrendIcon className="size-3.5" aria-hidden />
+          <span>{delta}</span>
         </div>
       )}
     </div>
   );
 }
 
-function SectionHeader({ icon, title }: { icon: string; title: string }) {
+function SectionHeader({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
   return (
     <div className="flex items-center gap-3 border-b border-zinc-800 pb-3 mb-5">
-      <span className="text-2xl">{icon}</span>
+      <Icon className="size-6 text-zinc-400" aria-hidden />
       <h2 className="text-xl font-semibold text-zinc-100 tracking-wide">{title}</h2>
     </div>
   );
@@ -93,7 +114,7 @@ export default async function Dashboard() {
           <div className="flex items-center gap-3">
             <div className="text-lg font-semibold tracking-tight">Community Dashboard</div>
             <select
-              className="rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm text-zinc-200"
+              className="rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm text-zinc-200 cursor-pointer transition-colors hover:border-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
               defaultValue="last-pirates"
             >
               <option value="last-pirates">Last Pirates: Die Together</option>
@@ -102,15 +123,15 @@ export default async function Dashboard() {
           </div>
           <div className="flex items-center gap-3">
             <select
-              className="rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm text-zinc-200"
+              className="rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm text-zinc-200 cursor-pointer transition-colors hover:border-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
               defaultValue="30d"
             >
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
               <option value="90d">Last 90 days</option>
             </select>
-            <button className="rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm hover:bg-zinc-800">
-              ↻ Refresh
+            <button className="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm text-zinc-200 cursor-pointer transition-colors hover:bg-zinc-800 hover:border-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40">
+              <RefreshCw className="size-3.5" aria-hidden /> Refresh
             </button>
           </div>
         </div>
@@ -118,14 +139,14 @@ export default async function Dashboard() {
 
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-12">
         <section>
-          <SectionHeader icon="📊" title="Discord" />
+          <SectionHeader icon={MessagesSquare} title="Discord" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <KpiCard label="Members" value={live ? fmtNum(d!.members) : "920"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
-            <KpiCard label="Active" value={live ? fmtNum(d!.activeAuthors30d) : "108"} delta={live ? "30d" : "demo"} trend={live ? "up" : "flat"} />
-            <KpiCard label="Messages" value={live ? fmtNum(d!.messages30d) : "1 548"} delta={live ? "30d" : "demo"} trend={live ? "up" : "flat"} />
-            <KpiCard label="New members" value={live ? fmtNum(d!.newMembers30d) : "539"} delta={live ? "30d" : "demo"} trend={live ? "up" : "flat"} />
-            <KpiCard label="New bugs" value={live ? fmtNum(d!.newBugs7d) : "3"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} />
-            <KpiCard label="New ideas" value={live ? fmtNum(d!.newIdeas7d) : "5"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="Members" value={live ? fmtNum(d!.members) : "920"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} icon={Users} />
+            <KpiCard label="Online now" value={live && d!.online !== null ? fmtNum(d!.online) : "—"} delta={live && d!.online !== null ? "live" : "no data yet"} trend={live && d!.online !== null ? "up" : "flat"} icon={Wifi} />
+            <KpiCard label="Messages" value={live ? fmtNum(d!.messages30d) : "1 548"} delta={live ? "30d" : "demo"} trend={live ? "up" : "flat"} icon={MessageSquare} />
+            <KpiCard label="New members" value={live ? fmtNum(d!.newMembers30d) : "539"} delta={live ? "30d" : "demo"} trend={live ? "up" : "flat"} icon={UserPlus} />
+            <KpiCard label="New bugs" value={live ? fmtNum(d!.newBugs7d) : "3"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} icon={Bug} />
+            <KpiCard label="New ideas" value={live ? fmtNum(d!.newIdeas7d) : "5"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} icon={Lightbulb} />
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -219,7 +240,7 @@ export default async function Dashboard() {
         </section>
 
         <section>
-          <SectionHeader icon="🎮" title="Steam Discussions" />
+          <SectionHeader icon={Gamepad2} title="Steam Discussions" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <KpiCard label="Active threads" value={live ? fmtNum(s!.activeThreads) : "34"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
             <KpiCard label="New threads (7d)" value={live ? fmtNum(s!.newThreads7d) : "4"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />

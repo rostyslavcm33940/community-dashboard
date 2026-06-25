@@ -4,6 +4,8 @@ export type DashboardStats = {
   hasDb: boolean;
   discord: {
     members: number;
+    online: number | null;
+    onlineTakenAt: string | null;
     activeAuthors30d: number;
     messages30d: number;
     newMembers30d: number;
@@ -69,6 +71,7 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       { data: steamThreads },
       { data: lastComments },
       { data: pinnedThreads },
+      { data: presenceLatest },
     ] = await Promise.all([
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).is("left_at", null),
       supabase.from("discord_messages").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("created_at", d30),
@@ -84,6 +87,7 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       supabase.from("steam_threads").select("*").eq("project_id", 1).order("created_at", { ascending: false }),
       supabase.from("steam_comments").select("content, author, created_at, is_dev_reply").eq("project_id", 1).order("created_at", { ascending: false }).limit(5),
       supabase.from("steam_threads").select("title, reply_count, author").eq("project_id", 1).eq("is_pinned", true),
+      supabase.from("discord_presence_snapshots").select("online_count, taken_at").eq("project_id", 1).order("taken_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
     const byChannel: Record<string, number> = {};
@@ -201,6 +205,8 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       hasDb: true,
       discord: {
         members: members ?? 0,
+        online: (presenceLatest as { online_count?: number | null } | null)?.online_count ?? null,
+        onlineTakenAt: (presenceLatest as { taken_at?: string | null } | null)?.taken_at ?? null,
         activeAuthors30d: activeAuthorsSet.size,
         messages30d: messages30d ?? 0,
         newMembers30d: newMembers30d ?? 0,

@@ -7,6 +7,7 @@ import {
   upsertMember,
   markMemberLeft,
   insertMessage,
+  insertPresenceSnapshot,
 } from "./db.js";
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
@@ -25,6 +26,7 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildPresences,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.MessageContent,
@@ -76,6 +78,32 @@ client.on(Events.MessageCreate, async (msg) => {
 });
 
 client.on(Events.Error, (err) => console.error("Discord error:", err));
+
+const SNAPSHOT_INTERVAL_MS = parseInt(process.env.PRESENCE_INTERVAL_MS || "300000", 10);
+
+async function snapshotPresence() {
+  try {
+    const guild = await client.guilds.fetch(GUILD_ID);
+    const members = await guild.members.fetch({ withPresences: true });
+    const counts = { online: 0, idle: 0, dnd: 0, offline: 0, total: 0 };
+    for (const [, m] of members) {
+      if (m.user?.bot) continue;
+      counts.total++;
+      const status = m.presence?.status ?? "offline";
+      if (status === "online") counts.online++;
+      else if (status === "idle") counts.idle++;
+      else if (status === "dnd") counts.dnd++;
+      else counts.offline++;
+    }
+    await insertPresenceSnapshot(counts);
+    console.log(`Presence snapshot: ${counts.online} online, ${counts.idle} idle, ${counts.dnd} dnd / ${counts.total} total`);
+  } catch (e) {
+    console.warn("Presence snapshot failed:", e.message);
+  }
+}
+
+setInterval(snapshotPresence, SNAPSHOT_INTERVAL_MS);
+setTimeout(snapshotPresence, 30_000);
 
 process.on("SIGTERM", () => {
   console.log("SIGTERM received, closing…");

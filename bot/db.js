@@ -68,6 +68,17 @@ export async function markMemberLeft(userId) {
     .eq("user_id", userId);
 }
 
+export async function insertPresenceSnapshot(counts) {
+  await supabase.from("discord_presence_snapshots").insert({
+    project_id: PROJECT_ID,
+    online_count: counts.online,
+    idle_count: counts.idle,
+    dnd_count: counts.dnd,
+    offline_count: counts.offline,
+    total_count: counts.total,
+  });
+}
+
 export async function insertMessage(msg) {
   await supabase.from("discord_messages").upsert(
     {
