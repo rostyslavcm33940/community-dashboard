@@ -53,11 +53,11 @@ client.once(Events.ClientReady, async (c) => {
   }
   console.log(`Synced ${channels.size} channels`);
 
-  const members = await guild.members.fetch();
+  const members = await guild.members.fetch({ withPresences: true });
   for (const [, m] of members) {
     await upsertMember(m);
   }
-  console.log(`Synced ${members.size} members`);
+  console.log(`Synced ${members.size} members (with presences)`);
 });
 
 client.on(Events.GuildMemberAdd, async (member) => {
@@ -83,10 +83,9 @@ const SNAPSHOT_INTERVAL_MS = parseInt(process.env.PRESENCE_INTERVAL_MS || "30000
 
 async function snapshotPresence() {
   try {
-    const guild = await client.guilds.fetch(GUILD_ID);
-    const members = await guild.members.fetch({ withPresences: true });
+    const guild = client.guilds.cache.get(GUILD_ID) ?? (await client.guilds.fetch(GUILD_ID));
     const counts = { online: 0, idle: 0, dnd: 0, offline: 0, total: 0 };
-    for (const [, m] of members) {
+    for (const [, m] of guild.members.cache) {
       if (m.user?.bot) continue;
       counts.total++;
       const status = m.presence?.status ?? "offline";
@@ -94,6 +93,10 @@ async function snapshotPresence() {
       else if (status === "idle") counts.idle++;
       else if (status === "dnd") counts.dnd++;
       else counts.offline++;
+    }
+    if (counts.total === 0) {
+      console.warn("Presence snapshot skipped: member cache empty");
+      return;
     }
     await insertPresenceSnapshot(counts);
     console.log(`Presence snapshot: ${counts.online} online, ${counts.idle} idle, ${counts.dnd} dnd / ${counts.total} total`);
@@ -103,7 +106,7 @@ async function snapshotPresence() {
 }
 
 setInterval(snapshotPresence, SNAPSHOT_INTERVAL_MS);
-setTimeout(snapshotPresence, 30_000);
+setTimeout(snapshotPresence, 60_000);
 
 process.on("SIGTERM", () => {
   console.log("SIGTERM received, closing…");
