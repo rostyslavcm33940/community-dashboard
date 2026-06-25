@@ -215,11 +215,32 @@ export default async function Dashboard() {
                 }))}
               />
             </Card>
-            <Card title="Notes">
-              <div className="text-sm text-zinc-400 leading-relaxed">
-                Дані оновлюються щогодини. Backfill історичних повідомлень виконано
-                після підключення бота.
-              </div>
+            <Card
+              title="Top 5 by MEE6 XP"
+              hint={
+                live && d!.topXp.length > 0 && d!.topXpTakenAt
+                  ? `snapshot · ${new Date(d!.topXpTakenAt).toLocaleDateString()}`
+                  : "no MEE6 data yet"
+              }
+            >
+              {live && d!.topXp.length > 0 ? (
+                <ul className="space-y-2.5 text-sm">
+                  {d!.topXp.map((row, i) => (
+                    <li key={row.name} className="flex items-center gap-2">
+                      <span className="inline-flex size-5 items-center justify-center rounded-full bg-amber-500/10 text-amber-400 text-xs font-medium">
+                        {i + 1}
+                      </span>
+                      <span className="flex-1 truncate text-zinc-200">{row.name}</span>
+                      <span className="text-xs text-zinc-500 tabular-nums">lvl {row.level}</span>
+                      <span className="text-xs text-zinc-400 tabular-nums w-16 text-right">
+                        {row.xp.toLocaleString("en-US").replace(/,/g, " ")} XP
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-xs text-zinc-600">MEE6 leaderboard not yet imported.</div>
+              )}
             </Card>
           </div>
 

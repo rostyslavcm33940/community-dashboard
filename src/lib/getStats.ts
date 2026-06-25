@@ -18,6 +18,8 @@ export type DashboardStats = {
     newMembersPerDay: { date: string; value: number }[];
     latestBugs: { title: string; author: string; at: string }[];
     latestIdeas: { title: string; author: string; at: string }[];
+    topXp: { name: string; xp: number; level: number; messages: number }[];
+    topXpTakenAt: string | null;
   };
   steam: {
     activeThreads: number;
@@ -100,6 +102,7 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       { data: lastNegative },
       { data: lastBugMentions },
       { data: reviewsForGraph },
+      { data: mee6Top },
     ] = await Promise.all([
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).is("left_at", null),
       supabase.from("discord_messages").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("created_at", d30),
@@ -121,6 +124,7 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug").eq("project_id", 1).eq("voted_up", false).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug").eq("project_id", 1).eq("mentions_bug", true).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("timestamp_created, voted_up, mentions_bug").eq("project_id", 1).gte("timestamp_created", new Date(now.getTime() - 90 * 86400_000).toISOString()),
+      supabase.from("mee6_leaderboard").select("username, xp, level, messages, taken_at").eq("project_id", 1).order("xp", { ascending: false }).limit(5),
     ]);
 
     const byChannel: Record<string, number> = {};
@@ -134,13 +138,17 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       byAuthorReactions[a] = (byAuthorReactions[a] ?? 0) + (m.reaction_count ?? 0);
     }
 
+    const EXCLUDED_CHANNELS = new Set(["welcome-deck", "welcome", "rules"]);
     const messagesByChannel = Object.entries(byChannel)
       .map(([name, value]) => ({ name: name.replace(/[^\w-]/g, ""), value }))
+      .filter((r) => !EXCLUDED_CHANNELS.has(r.name.toLowerCase()))
       .sort((a, b) => b.value - a.value)
       .slice(0, 7);
 
+    const EXCLUDED_AUTHORS = new Set(["mee6", "MEE6", "Carl-bot", "carl-bot", "AutoMod"]);
     const topActive = Object.entries(byAuthor)
       .map(([name, value]) => ({ name, value }))
+      .filter((r) => !EXCLUDED_AUTHORS.has(r.name))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
 
@@ -320,6 +328,13 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
           author: m.author_name ?? "",
           at: shortDate(m.created_at),
         })),
+        topXp: ((mee6Top ?? []) as { username: string; xp: number; level: number; messages: number }[]).map((r) => ({
+          name: r.username,
+          xp: r.xp ?? 0,
+          level: r.level ?? 0,
+          messages: r.messages ?? 0,
+        })),
+        topXpTakenAt: (mee6Top?.[0] as { taken_at?: string } | undefined)?.taken_at ?? null,
       },
       steam: {
         activeThreads: threads.length,
