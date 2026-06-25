@@ -1,3 +1,33 @@
+import { Card } from "@/components/Card";
+import { LineChartCard } from "@/components/charts/LineChartCard";
+import { BarChartCard } from "@/components/charts/BarChartCard";
+import { PieChartCard } from "@/components/charts/PieChartCard";
+import { BarList } from "@/components/charts/BarList";
+import { ItemList } from "@/components/charts/ItemList";
+import { Heatmap } from "@/components/charts/Heatmap";
+import {
+  discordNewMembersPerDay,
+  discordMessagesPerDay,
+  discordNewBugsPerWeek,
+  discordNewIdeasPerWeek,
+  discordMessagesByChannel,
+  discordTopActive,
+  discordTopReactions,
+  discordLatestBugs,
+  discordLatestIdeas,
+  discordHeatmap,
+  insightsCountries,
+  insightsDevices,
+  steamThreadsPerWeek,
+  steamCommentsPerWeek,
+  steamSubForumSplit,
+  steamLastThreads,
+  steamLastComments,
+  steamTopHottest,
+  steamTopPosters,
+  steamPinned,
+} from "@/lib/mockData";
+
 type KPI = {
   label: string;
   value: string | number;
@@ -15,9 +45,7 @@ function KpiCard({ label, value, delta, trend }: KPI) {
   const arrow = trend === "up" ? "↑" : trend === "down" ? "↓" : "→";
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-      <div className="text-xs uppercase tracking-wide text-zinc-500">
-        {label}
-      </div>
+      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
       <div className="mt-2 text-3xl font-semibold text-zinc-100">{value}</div>
       {delta && (
         <div className={`mt-1 text-sm ${trendColor}`}>
@@ -32,19 +60,7 @@ function SectionHeader({ icon, title }: { icon: string; title: string }) {
   return (
     <div className="flex items-center gap-3 border-b border-zinc-800 pb-3 mb-5">
       <span className="text-2xl">{icon}</span>
-      <h2 className="text-xl font-semibold text-zinc-100 tracking-wide">
-        {title}
-      </h2>
-    </div>
-  );
-}
-
-function Placeholder({ title, hint }: { title: string; hint?: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950 p-6 min-h-[160px] flex flex-col">
-      <div className="text-sm font-medium text-zinc-300">{title}</div>
-      {hint && <div className="text-xs text-zinc-600 mt-1">{hint}</div>}
-      <div className="mt-auto text-xs text-zinc-700">— chart coming —</div>
+      <h2 className="text-xl font-semibold text-zinc-100 tracking-wide">{title}</h2>
     </div>
   );
 }
@@ -55,9 +71,7 @@ export default function Dashboard() {
       <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="text-lg font-semibold tracking-tight">
-              Community Dashboard
-            </div>
+            <div className="text-lg font-semibold tracking-tight">Community Dashboard</div>
             <select
               className="rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm text-zinc-200"
               defaultValue="last-pirates"
@@ -95,26 +109,91 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Placeholder title="New members per day" />
-            <Placeholder title="Messages per day" />
-            <Placeholder title="Messages by channel" />
-            <Placeholder title="Activity heatmap" hint="day × hour" />
-            <Placeholder title="Top 5 active members" />
-            <Placeholder title="Top 5 by reactions" />
-            <Placeholder title="Latest bugs (#sea-bugs)" />
-            <Placeholder title="Latest ideas (#your-ideas)" />
-            <Placeholder title="Retention week-1 / activation %" />
+            <Card title="New members per day" hint="last 30 days">
+              <LineChartCard data={discordNewMembersPerDay} color="#34d399" />
+            </Card>
+            <Card title="Messages per day" hint="last 30 days">
+              <LineChartCard data={discordMessagesPerDay} color="#60a5fa" />
+            </Card>
+            <Card title="Messages by channel" hint="last 30 days, top 7">
+              <BarChartCard data={discordMessagesByChannel} horizontal color="#60a5fa" />
+            </Card>
+
+            <Card title="New bugs per week" hint="from #sea-bugs">
+              <BarChartCard data={discordNewBugsPerWeek} color="#f43f5e" />
+            </Card>
+            <Card title="New ideas per week" hint="from #your-ideas">
+              <BarChartCard data={discordNewIdeasPerWeek} color="#a78bfa" />
+            </Card>
+            <Card title="Activity heatmap" hint="day × hour">
+              <Heatmap grid={discordHeatmap} />
+            </Card>
+
+            <Card title="Top 5 active members" hint="by messages">
+              <BarList data={discordTopActive} color="bg-emerald-500/70" />
+            </Card>
+            <Card title="Top 5 by reactions" hint="reactions received">
+              <BarList data={discordTopReactions} color="bg-amber-500/70" />
+            </Card>
+            <Card title="Retention & activation">
+              <div className="grid grid-cols-2 gap-3 h-full">
+                <div className="rounded-lg bg-zinc-900/60 p-3 flex flex-col justify-center">
+                  <div className="text-xs text-zinc-500 uppercase">Retention W1</div>
+                  <div className="text-2xl font-semibold text-zinc-100 mt-1">40.1%</div>
+                  <div className="text-xs text-emerald-400 mt-0.5">↑ +2.3%</div>
+                </div>
+                <div className="rounded-lg bg-zinc-900/60 p-3 flex flex-col justify-center">
+                  <div className="text-xs text-zinc-500 uppercase">Activation</div>
+                  <div className="text-2xl font-semibold text-zinc-100 mt-1">22.6%</div>
+                  <div className="text-xs text-rose-400 mt-0.5">↓ −1.1%</div>
+                </div>
+              </div>
+            </Card>
+
+            <Card title="Latest bugs" hint="#sea-bugs">
+              <ItemList
+                items={discordLatestBugs.map((b) => ({
+                  title: b.title,
+                  subtitle: `by ${b.author}`,
+                  meta: b.at,
+                }))}
+              />
+            </Card>
+            <Card title="Latest ideas" hint="#your-ideas">
+              <ItemList
+                items={discordLatestIdeas.map((b) => ({
+                  title: b.title,
+                  subtitle: `by ${b.author}`,
+                  meta: b.at,
+                }))}
+              />
+            </Card>
+            <Card title="Notes">
+              <div className="text-sm text-zinc-400 leading-relaxed">
+                Дані оновлюються щогодини. Backfill історичних повідомлень виконано
+                після підключення бота.
+              </div>
+            </Card>
           </div>
 
-          <div className="mt-6">
-            <div className="text-sm uppercase tracking-wide text-zinc-500 mb-2">
-              CSV Insights (manual upload, weekly)
+          <div className="mt-8">
+            <div className="text-sm uppercase tracking-wide text-zinc-500 mb-3">
+              CSV Insights — manual upload, weekly
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-              <Placeholder title="Drop Insights CSV here" hint="Growth / Audience / Engagement" />
-              <Placeholder title="Countries" hint="UA 11% · US 25% · Other 64%" />
-              <Placeholder title="Devices" hint="Desktop+Mobile 58% · Desktop 29% · Mobile 8%" />
-              <Placeholder title="Visitors trend" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Card title="Drop Insights CSV here" hint="Growth / Audience / Engagement">
+                <div className="border-2 border-dashed border-zinc-800 rounded-lg p-6 text-center text-xs text-zinc-500 h-full flex flex-col items-center justify-center">
+                  <div className="text-2xl mb-2">📤</div>
+                  <div>Drop CSV files here</div>
+                  <div className="text-zinc-700 mt-1">or click to browse</div>
+                </div>
+              </Card>
+              <Card title="Countries" hint="last 28 days">
+                <PieChartCard data={insightsCountries} />
+              </Card>
+              <Card title="Devices" hint="last 28 days">
+                <PieChartCard data={insightsDevices} />
+              </Card>
             </div>
           </div>
         </section>
@@ -130,20 +209,72 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Placeholder title="Threads per week" />
-            <Placeholder title="Comments per week" />
-            <Placeholder title="Sub-forum split" hint="General / Reported / Events / Trading" />
-            <Placeholder title="Last 5 threads" />
-            <Placeholder title="Last 5 comments" />
-            <Placeholder title="Top 5 hottest threads" />
-            <Placeholder title="Top 5 posters" />
-            <Placeholder title="Pinned threads tracker" />
-            <Placeholder title="Avg time-to-first-reply" />
+            <Card title="Threads per week" hint="last 8 weeks">
+              <BarChartCard data={steamThreadsPerWeek} color="#34d399" />
+            </Card>
+            <Card title="Comments per week" hint="last 8 weeks">
+              <BarChartCard data={steamCommentsPerWeek} color="#60a5fa" />
+            </Card>
+            <Card title="Sub-forum split" hint="active threads">
+              <PieChartCard data={steamSubForumSplit} />
+            </Card>
+
+            <Card title="Last 5 threads">
+              <ItemList
+                items={steamLastThreads.map((t) => ({
+                  title: t.title,
+                  subtitle: `by ${t.author}`,
+                  meta: t.at,
+                }))}
+              />
+            </Card>
+            <Card title="Last 5 comments">
+              <ItemList
+                items={steamLastComments.map((c) => ({
+                  title: c.snippet,
+                  subtitle: `by ${c.author}`,
+                  meta: c.at,
+                }))}
+              />
+            </Card>
+            <Card title="Top 5 hottest" hint="by replies, last 30d">
+              <ItemList
+                items={steamTopHottest.map((t) => ({
+                  title: t.title,
+                  badge: `${t.replies} replies`,
+                }))}
+              />
+            </Card>
+
+            <Card title="Top 5 posters" hint="threads + comments">
+              <BarList data={steamTopPosters} color="bg-blue-500/70" />
+            </Card>
+            <Card title="Pinned threads tracker" hint="active pins">
+              <ItemList
+                items={steamPinned.map((p) => ({
+                  title: p.title,
+                  subtitle: `by ${p.author}`,
+                  badge: `${p.replies} replies`,
+                }))}
+              />
+            </Card>
+            <Card title="Avg time-to-first-reply" hint="last 30 days">
+              <div className="grid grid-cols-2 gap-3 h-full">
+                <div className="rounded-lg bg-zinc-900/60 p-3 flex flex-col justify-center">
+                  <div className="text-xs text-zinc-500 uppercase">Any reply</div>
+                  <div className="text-2xl font-semibold text-zinc-100 mt-1">3h 42m</div>
+                </div>
+                <div className="rounded-lg bg-zinc-900/60 p-3 flex flex-col justify-center">
+                  <div className="text-xs text-zinc-500 uppercase">Dev reply</div>
+                  <div className="text-2xl font-semibold text-zinc-100 mt-1">11h 8m</div>
+                </div>
+              </div>
+            </Card>
           </div>
         </section>
 
         <footer className="text-center text-xs text-zinc-600 pt-8 pb-4">
-          MVP scaffold · data is mocked · v0.1
+          MVP scaffold · data is mocked · v0.2
         </footer>
       </main>
     </div>
