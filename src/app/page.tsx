@@ -5,6 +5,8 @@ import { PieChartCard } from "@/components/charts/PieChartCard";
 import { BarList } from "@/components/charts/BarList";
 import { ItemList } from "@/components/charts/ItemList";
 import { Heatmap } from "@/components/charts/Heatmap";
+import { CsvUploadCard } from "@/components/CsvUploadCard";
+import { getLatestInsights } from "@/lib/getInsights";
 import {
   discordNewMembersPerDay,
   discordMessagesPerDay,
@@ -27,6 +29,8 @@ import {
   steamTopPosters,
   steamPinned,
 } from "@/lib/mockData";
+
+export const dynamic = "force-dynamic";
 
 type KPI = {
   label: string;
@@ -65,7 +69,17 @@ function SectionHeader({ icon, title }: { icon: string; title: string }) {
   );
 }
 
-export default function Dashboard() {
+export default async function Dashboard() {
+  const insights = await getLatestInsights();
+  const countriesData =
+    insights.audience?.countries && insights.audience.countries.length > 0
+      ? insights.audience.countries
+      : insightsCountries;
+  const devicesData =
+    insights.audience?.devices && insights.audience.devices.length > 0
+      ? insights.audience.devices
+      : insightsDevices;
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-200">
       <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur">
@@ -181,18 +195,18 @@ export default function Dashboard() {
               CSV Insights — manual upload, weekly
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card title="Drop Insights CSV here" hint="Growth / Audience / Engagement">
-                <div className="border-2 border-dashed border-zinc-800 rounded-lg p-6 text-center text-xs text-zinc-500 h-full flex flex-col items-center justify-center">
-                  <div className="text-2xl mb-2">📤</div>
-                  <div>Drop CSV files here</div>
-                  <div className="text-zinc-700 mt-1">or click to browse</div>
-                </div>
+              <CsvUploadCard lastUploadAt={insights.audienceUploadedAt ?? undefined} />
+              <Card
+                title="Countries"
+                hint={insights.audience?.countries ? "from CSV" : "mocked"}
+              >
+                <PieChartCard data={countriesData} />
               </Card>
-              <Card title="Countries" hint="last 28 days">
-                <PieChartCard data={insightsCountries} />
-              </Card>
-              <Card title="Devices" hint="last 28 days">
-                <PieChartCard data={insightsDevices} />
+              <Card
+                title="Devices"
+                hint={insights.audience?.devices ? "from CSV" : "mocked"}
+              >
+                <PieChartCard data={devicesData} />
               </Card>
             </div>
           </div>
