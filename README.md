@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Community Dashboard
 
-## Getting Started
+Live: https://community-dashboard-gdqcghrf7-rostyslavcm33940s-projects.vercel.app
 
-First, run the development server:
+Multi-source community dashboard. v1 targets **Last Pirates: Die Together** — Discord server + Steam Discussions.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Architecture
+
+```
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│ Discord Bot  │    │ Steam        │    │ CSV Upload   │
+│ (bot/)       │    │ Scraper      │    │ (web form)   │
+│ Node + d.js  │    │ (scraper/)   │    │              │
+└──────┬───────┘    └──────┬───────┘    └──────┬───────┘
+       │                   │                   │
+       └───────────────────┼───────────────────┘
+                           │
+                   ┌───────▼────────┐
+                   │   Supabase     │
+                   │   (Postgres)   │
+                   └───────┬────────┘
+                           │
+                   ┌───────▼────────┐
+                   │  Next.js       │
+                   │  (Vercel)      │
+                   │  src/          │
+                   └────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Repo layout
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+.
+├── src/                         Next.js dashboard (deployed to Vercel)
+├── bot/                         Discord bot — separate Node service
+├── scraper/                     Steam scraper — separate Node service
+├── db/
+│   ├── schema.sql               Core tables (projects, insights uploads)
+│   ├── schema_bot.sql           Discord bot tables
+│   └── schema_steam.sql         Steam scraper tables
+└── .env.local.example           Frontend env template
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Setup checklist
 
-## Learn More
+In rough order:
 
-To learn more about Next.js, take a look at the following resources:
+1. **Supabase project** — already created (`ztxtoaogbbpkkvcqvorq.supabase.co`).
+2. **Run migrations** — paste each `db/*.sql` into [SQL Editor](https://supabase.com/dashboard/project/ztxtoaogbbpkkvcqvorq/sql/new) and Run.
+3. **Frontend env vars** — copy `.env.local.example` → `.env.local`, fill in keys from [API Keys](https://supabase.com/dashboard/project/ztxtoaogbbpkkvcqvorq/settings/api-keys).
+4. **Vercel env vars** — same keys in [Vercel project settings](https://vercel.com/rostyslavcm33940s-projects/community-dashboard/settings/environment-variables).
+5. **Discord bot** — see `bot/README.md`.
+6. **Steam scraper** — see `scraper/README.md`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Local dev
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+npm install
+npm run dev
+# http://localhost:3000
+```
 
-## Deploy on Vercel
+Without Supabase env vars the dashboard runs on mocked data (still useful for UI work).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Data sources
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Metric | Source |
+|---|---|
+| Members total / new / churn | Discord bot |
+| Retention, activation | Discord bot (computed from join + first message) |
+| Messages, top channels, top members | Discord bot |
+| Bugs / ideas from #sea-bugs / #your-ideas | Discord bot |
+| Heatmap activity | Discord bot |
+| Countries, devices, visitors, mutes | CSV upload from Discord Insights |
+| Steam threads, comments, dev-response % | Steam scraper |
+| Pinned threads, sub-forum split | Steam scraper |
