@@ -154,7 +154,8 @@ export async function scrape() {
   console.log("Scrape done.");
 }
 
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}`) {
+import { pathToFileURL } from "url";
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   scrape().catch((e) => {
     console.error(e);
     process.exit(1);

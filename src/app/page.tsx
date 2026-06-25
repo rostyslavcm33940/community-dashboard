@@ -7,6 +7,7 @@ import { ItemList } from "@/components/charts/ItemList";
 import { Heatmap } from "@/components/charts/Heatmap";
 import { CsvUploadCard } from "@/components/CsvUploadCard";
 import { getLatestInsights } from "@/lib/getInsights";
+import { getDashboardStats } from "@/lib/getStats";
 import {
   discordNewMembersPerDay,
   discordMessagesPerDay,
@@ -70,7 +71,7 @@ function SectionHeader({ icon, title }: { icon: string; title: string }) {
 }
 
 export default async function Dashboard() {
-  const insights = await getLatestInsights();
+  const [insights, stats] = await Promise.all([getLatestInsights(), getDashboardStats()]);
   const countriesData =
     insights.audience?.countries && insights.audience.countries.length > 0
       ? insights.audience.countries
@@ -79,6 +80,11 @@ export default async function Dashboard() {
     insights.audience?.devices && insights.audience.devices.length > 0
       ? insights.audience.devices
       : insightsDevices;
+
+  const live = stats && stats.discord.members > 0;
+  const d = stats?.discord;
+  const s = stats?.steam;
+  const fmtNum = (n: number) => n.toLocaleString("en-US").replace(/,/g, " ");
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-200">
@@ -114,23 +120,23 @@ export default async function Dashboard() {
         <section>
           <SectionHeader icon="📊" title="Discord" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <KpiCard label="Members" value="920" delta="+12% vs prev" trend="up" />
-            <KpiCard label="Active" value="108" delta="−3%" trend="down" />
-            <KpiCard label="Messages" value="1 548" delta="+18%" trend="up" />
-            <KpiCard label="New members" value="539" delta="+22%" trend="up" />
-            <KpiCard label="New bugs" value="3" delta="−1" trend="down" />
-            <KpiCard label="New ideas" value="5" delta="+2" trend="up" />
+            <KpiCard label="Members" value={live ? fmtNum(d!.members) : "920"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="Active" value={live ? fmtNum(d!.activeAuthors30d) : "108"} delta={live ? "30d" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="Messages" value={live ? fmtNum(d!.messages30d) : "1 548"} delta={live ? "30d" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="New members" value={live ? fmtNum(d!.newMembers30d) : "539"} delta={live ? "30d" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="New bugs" value={live ? fmtNum(d!.newBugs7d) : "3"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="New ideas" value={live ? fmtNum(d!.newIdeas7d) : "5"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} />
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Card title="New members per day" hint="last 30 days">
-              <LineChartCard data={discordNewMembersPerDay} color="#34d399" />
+            <Card title="New members per day" hint={live ? "last 30 days" : "demo"}>
+              <LineChartCard data={live && d!.newMembersPerDay.length > 0 ? d!.newMembersPerDay : discordNewMembersPerDay} color="#34d399" />
             </Card>
-            <Card title="Messages per day" hint="last 30 days">
-              <LineChartCard data={discordMessagesPerDay} color="#60a5fa" />
+            <Card title="Messages per day" hint={live ? "last 30 days" : "demo"}>
+              <LineChartCard data={live && d!.messagesPerDay.length > 0 ? d!.messagesPerDay : discordMessagesPerDay} color="#60a5fa" />
             </Card>
-            <Card title="Messages by channel" hint="last 30 days, top 7">
-              <BarChartCard data={discordMessagesByChannel} horizontal color="#60a5fa" />
+            <Card title="Messages by channel" hint={live ? "last 30 days, top 7" : "demo"}>
+              <BarChartCard data={live && d!.messagesByChannel.length > 0 ? d!.messagesByChannel : discordMessagesByChannel} horizontal color="#60a5fa" />
             </Card>
 
             <Card title="New bugs per week" hint="from #sea-bugs">
@@ -143,11 +149,11 @@ export default async function Dashboard() {
               <Heatmap grid={discordHeatmap} />
             </Card>
 
-            <Card title="Top 5 active members" hint="by messages">
-              <BarList data={discordTopActive} color="bg-emerald-500/70" />
+            <Card title="Top 5 active members" hint={live ? "by messages, 30d" : "demo"}>
+              <BarList data={live && d!.topActive.length > 0 ? d!.topActive : discordTopActive} color="bg-emerald-500/70" />
             </Card>
-            <Card title="Top 5 by reactions" hint="reactions received">
-              <BarList data={discordTopReactions} color="bg-amber-500/70" />
+            <Card title="Top 5 by reactions" hint={live ? "reactions received, 30d" : "demo"}>
+              <BarList data={live && d!.topReactions.length > 0 ? d!.topReactions : discordTopReactions} color="bg-amber-500/70" />
             </Card>
             <Card title="Retention & activation">
               <div className="grid grid-cols-2 gap-3 h-full">
@@ -164,18 +170,18 @@ export default async function Dashboard() {
               </div>
             </Card>
 
-            <Card title="Latest bugs" hint="#sea-bugs">
+            <Card title="Latest bugs" hint={live ? "live" : "demo"}>
               <ItemList
-                items={discordLatestBugs.map((b) => ({
+                items={(live && d!.latestBugs.length > 0 ? d!.latestBugs : discordLatestBugs).map((b) => ({
                   title: b.title,
                   subtitle: `by ${b.author}`,
                   meta: b.at,
                 }))}
               />
             </Card>
-            <Card title="Latest ideas" hint="#your-ideas">
+            <Card title="Latest ideas" hint={live ? "live" : "demo"}>
               <ItemList
-                items={discordLatestIdeas.map((b) => ({
+                items={(live && d!.latestIdeas.length > 0 ? d!.latestIdeas : discordLatestIdeas).map((b) => ({
                   title: b.title,
                   subtitle: `by ${b.author}`,
                   meta: b.at,
@@ -215,11 +221,11 @@ export default async function Dashboard() {
         <section>
           <SectionHeader icon="🎮" title="Steam Discussions" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <KpiCard label="Active threads" value="34" delta="+4" trend="up" />
-            <KpiCard label="New threads (7d)" value="4" delta="+1" trend="up" />
-            <KpiCard label="New comments (7d)" value="28" delta="+5" trend="up" />
-            <KpiCard label="Unanswered" value="2" delta="0" trend="flat" />
-            <KpiCard label="Dev response %" value="75%" delta="+10%" trend="up" />
+            <KpiCard label="Active threads" value={live ? fmtNum(s!.activeThreads) : "34"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="New threads (7d)" value={live ? fmtNum(s!.newThreads7d) : "4"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="New comments (7d)" value={live ? fmtNum(s!.newComments7d) : "28"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="Unanswered" value={live ? fmtNum(s!.unanswered) : "2"} delta={live ? "live" : "demo"} trend={live ? "flat" : "flat"} />
+            <KpiCard label="Dev response %" value={live ? `${s!.devResponsePct}%` : "75%"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} />
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -229,43 +235,43 @@ export default async function Dashboard() {
             <Card title="Comments per week" hint="last 8 weeks">
               <BarChartCard data={steamCommentsPerWeek} color="#60a5fa" />
             </Card>
-            <Card title="Sub-forum split" hint="active threads">
-              <PieChartCard data={steamSubForumSplit} />
+            <Card title="Sub-forum split" hint={live ? "active threads" : "demo"}>
+              <PieChartCard data={live && s!.subForumSplit.length > 0 ? s!.subForumSplit : steamSubForumSplit} />
             </Card>
 
-            <Card title="Last 5 threads">
+            <Card title="Last 5 threads" hint={live ? "live" : "demo"}>
               <ItemList
-                items={steamLastThreads.map((t) => ({
+                items={(live && s!.lastThreads.length > 0 ? s!.lastThreads : steamLastThreads).map((t) => ({
                   title: t.title,
                   subtitle: `by ${t.author}`,
                   meta: t.at,
                 }))}
               />
             </Card>
-            <Card title="Last 5 comments">
+            <Card title="Last 5 comments" hint={live ? "live" : "demo"}>
               <ItemList
-                items={steamLastComments.map((c) => ({
+                items={(live && s!.lastComments.length > 0 ? s!.lastComments : steamLastComments).map((c) => ({
                   title: c.snippet,
                   subtitle: `by ${c.author}`,
                   meta: c.at,
                 }))}
               />
             </Card>
-            <Card title="Top 5 hottest" hint="by replies, last 30d">
+            <Card title="Top 5 hottest" hint={live ? "by replies" : "demo"}>
               <ItemList
-                items={steamTopHottest.map((t) => ({
+                items={(live && s!.topHottest.length > 0 ? s!.topHottest : steamTopHottest).map((t) => ({
                   title: t.title,
                   badge: `${t.replies} replies`,
                 }))}
               />
             </Card>
 
-            <Card title="Top 5 posters" hint="threads + comments">
-              <BarList data={steamTopPosters} color="bg-blue-500/70" />
+            <Card title="Top 5 posters" hint={live ? "by comments, 30d" : "demo"}>
+              <BarList data={live && s!.topPosters.length > 0 ? s!.topPosters : steamTopPosters} color="bg-blue-500/70" />
             </Card>
-            <Card title="Pinned threads tracker" hint="active pins">
+            <Card title="Pinned threads tracker" hint={live ? "live" : "demo"}>
               <ItemList
-                items={steamPinned.map((p) => ({
+                items={(live && s!.pinned.length > 0 ? s!.pinned : steamPinned).map((p) => ({
                   title: p.title,
                   subtitle: `by ${p.author}`,
                   badge: `${p.replies} replies`,
