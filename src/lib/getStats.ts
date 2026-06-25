@@ -70,6 +70,20 @@ function shortDate(iso: string | null | undefined) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
+async function paginate<T>(makeQuery: (from: number, to: number) => Promise<{ data: T[] | null; error: { message: string } | null }>, pageSize = 1000, maxPages = 100): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 0; page < maxPages; page++) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await makeQuery(from, to);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    out.push(...data);
+    if (data.length < pageSize) break;
+  }
+  return out;
+}
+
 export async function getDashboardStats(): Promise<DashboardStats | null> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return null;
@@ -109,11 +123,11 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("joined_at", d30),
       supabase.from("discord_messages").select("id, channel_name, created_at").eq("project_id", 1).gte("created_at", d7).ilike("channel_name", "%bugs%"),
       supabase.from("discord_messages").select("id, channel_name, created_at").eq("project_id", 1).gte("created_at", d7).ilike("channel_name", "%ideas%"),
-      supabase.from("discord_messages").select("channel_name, author_name, created_at, reaction_count").eq("project_id", 1).gte("created_at", d30).limit(50000),
-      supabase.from("discord_messages").select("author_name").eq("project_id", 1).gte("created_at", d30),
+      paginate<{ channel_name: string | null; author_name: string | null; created_at: string | null; reaction_count: number | null }>((from, to) => supabase.from("discord_messages").select("channel_name, author_name, created_at, reaction_count").eq("project_id", 1).gte("created_at", d30).range(from, to)).then((data) => ({ data, error: null })),
+      Promise.resolve({ data: null }),
       supabase.from("discord_messages").select("content, author_name, created_at, channel_name").eq("project_id", 1).ilike("channel_name", "%bugs%").order("created_at", { ascending: false }).limit(5),
       supabase.from("discord_messages").select("content, author_name, created_at, channel_name").eq("project_id", 1).ilike("channel_name", "%ideas%").order("created_at", { ascending: false }).limit(5),
-      supabase.from("discord_messages").select("created_at").eq("project_id", 1).gte("created_at", d30),
+      Promise.resolve({ data: null }),
       supabase.from("discord_members").select("joined_at").eq("project_id", 1).gte("joined_at", d30),
       supabase.from("steam_threads").select("*").eq("project_id", 1).order("created_at", { ascending: false }),
       supabase.from("steam_comments").select("content, author, created_at, is_dev_reply").eq("project_id", 1).order("created_at", { ascending: false }).limit(5),
@@ -131,19 +145,24 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
     const byAuthor: Record<string, number> = {};
     const byAuthorReactions: Record<string, number> = {};
     for (const m of allMsg30d ?? []) {
-      const c = m.channel_name ?? "unknown";
-      byChannel[c] = (byChannel[c] ?? 0) + 1;
       const a = m.author_name ?? "unknown";
       byAuthor[a] = (byAuthor[a] ?? 0) + 1;
       byAuthorReactions[a] = (byAuthorReactions[a] ?? 0) + (m.reaction_count ?? 0);
     }
 
+    const allMsgChannels = await paginate<{ channel_name: string | null }>(
+      (from, to) => supabase.from("discord_messages").select("channel_name").eq("project_id", 1).range(from, to)
+    );
+    for (const m of allMsgChannels) {
+      const c = m.channel_name ?? "unknown";
+      byChannel[c] = (byChannel[c] ?? 0) + 1;
+    }
+
     const EXCLUDED_CHANNELS = new Set(["welcome-deck", "welcome", "rules"]);
     const messagesByChannel = Object.entries(byChannel)
-      .map(([name, value]) => ({ name: name.replace(/[^\w-]/g, ""), value }))
-      .filter((r) => !EXCLUDED_CHANNELS.has(r.name.toLowerCase()))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 7);
+      .map(([name, value]) => ({ name: name.replace(/[^\w-]/g, "").trim() || "unknown", value }))
+      .filter((r) => !EXCLUDED_CHANNELS.has(r.name.toLowerCase()) && r.value > 0)
+      .sort((a, b) => b.value - a.value);
 
     const EXCLUDED_AUTHORS = new Set(["mee6", "MEE6", "Carl-bot", "carl-bot", "AutoMod"]);
     const topActive = Object.entries(byAuthor)
@@ -158,14 +177,14 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
       .slice(0, 5)
       .filter((x) => x.value > 0);
 
-    const activeAuthorsSet = new Set((activeAuthors ?? []).map((r) => r.author_name).filter(Boolean));
+    const activeAuthorsSet = new Set((allMsg30d ?? []).map((r) => r.author_name).filter(Boolean));
 
     const msgDayCounts: Record<string, number> = {};
     for (let i = 29; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 86400_000);
       msgDayCounts[fmt(d)] = 0;
     }
-    for (const m of msgDays ?? []) {
+    for (const m of allMsg30d ?? []) {
       if (!m.created_at) continue;
       const k = fmt(new Date(m.created_at));
       if (k in msgDayCounts) msgDayCounts[k]++;

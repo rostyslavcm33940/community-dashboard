@@ -162,7 +162,7 @@ export default async function Dashboard() {
             <Card title="Messages per day" hint={live ? "last 30 days" : "demo"}>
               <LineChartCard data={live && d!.messagesPerDay.length > 0 ? d!.messagesPerDay : discordMessagesPerDay} color="#60a5fa" />
             </Card>
-            <Card title="Messages by channel" hint={live ? "last 30 days, top 7" : "demo"}>
+            <Card title="Messages by channel" hint={live ? "all time, all channels" : "demo"}>
               <BarChartCard data={live && d!.messagesByChannel.length > 0 ? d!.messagesByChannel : discordMessagesByChannel} horizontal color="#60a5fa" />
             </Card>
 
