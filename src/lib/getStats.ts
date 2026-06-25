@@ -70,7 +70,7 @@ function shortDate(iso: string | null | undefined) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
-async function paginate<T>(makeQuery: (from: number, to: number) => Promise<{ data: T[] | null; error: { message: string } | null }>, pageSize = 1000, maxPages = 100): Promise<T[]> {
+async function paginate<T>(makeQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>, pageSize = 1000, maxPages = 100): Promise<T[]> {
   const out: T[] = [];
   for (let page = 0; page < maxPages; page++) {
     const from = page * pageSize;
@@ -84,14 +84,16 @@ async function paginate<T>(makeQuery: (from: number, to: number) => Promise<{ da
   return out;
 }
 
-export async function getDashboardStats(): Promise<DashboardStats | null> {
+export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats | null> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return null;
   }
 
   const supabase = serverClient();
   const now = new Date();
-  const d30 = new Date(now.getTime() - 30 * 86400_000).toISOString();
+  // Selectable activity window (7 / 30 / 90d) — drives messages, new members,
+  // per-day charts and top contributors. Bug/idea/thread metrics stay fixed at 7d.
+  const d30 = new Date(now.getTime() - rangeDays * 86400_000).toISOString();
   const d7 = new Date(now.getTime() - 7 * 86400_000).toISOString();
 
   try {
@@ -180,7 +182,7 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
     const activeAuthorsSet = new Set((allMsg30d ?? []).map((r) => r.author_name).filter(Boolean));
 
     const msgDayCounts: Record<string, number> = {};
-    for (let i = 29; i >= 0; i--) {
+    for (let i = rangeDays - 1; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 86400_000);
       msgDayCounts[fmt(d)] = 0;
     }
@@ -192,7 +194,7 @@ export async function getDashboardStats(): Promise<DashboardStats | null> {
     const messagesPerDay = Object.entries(msgDayCounts).map(([date, value]) => ({ date, value }));
 
     const memberDayCounts: Record<string, number> = {};
-    for (let i = 29; i >= 0; i--) {
+    for (let i = rangeDays - 1; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 86400_000);
       memberDayCounts[fmt(d)] = 0;
     }

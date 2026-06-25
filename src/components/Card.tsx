@@ -10,10 +10,10 @@ export function Card({
   children: ReactNode;
 }) {
   return (
-    <div className="group rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4 flex flex-col min-h-[220px] shadow-[0_1px_2px_rgba(0,0,0,0.4)] transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-900/60 hover:shadow-[0_4px_16px_rgba(0,0,0,0.5)] motion-reduce:transition-none">
-      <div className="mb-3">
-        <div className="text-sm font-medium text-zinc-200">{title}</div>
-        {hint && <div className="text-xs text-zinc-500 mt-0.5">{hint}</div>}
+    <div className="group rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 flex flex-col min-h-[220px] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)] transition-all duration-200 hover:border-white/[0.14] hover:bg-white/[0.045] motion-reduce:transition-none">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <div className="text-sm font-medium text-zinc-100 tracking-tight">{title}</div>
+        {hint && <div className="text-[11px] text-zinc-500 shrink-0 tabular-nums">{hint}</div>}
       </div>
       <div className="flex-1 min-h-0">{children}</div>
     </div>

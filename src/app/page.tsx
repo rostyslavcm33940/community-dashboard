@@ -10,6 +10,7 @@ import { ReviewList } from "@/components/ReviewList";
 import { StackedBarChart } from "@/components/charts/StackedBarChart";
 import { getLatestInsights } from "@/lib/getInsights";
 import { getDashboardStats } from "@/lib/getStats";
+import { DashboardControls } from "@/components/DashboardControls";
 import {
   Users,
   Wifi,
@@ -25,7 +26,6 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  RefreshCw,
 } from "lucide-react";
 import {
   discordNewMembersPerDay,
@@ -71,14 +71,15 @@ function KpiCard({ label, value, delta, trend, icon: Icon }: KPI) {
       : "text-zinc-400";
   const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
   return (
-    <div className="group rounded-xl border border-zinc-800/80 bg-zinc-900/60 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.4)] transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-900/80 hover:shadow-[0_4px_16px_rgba(0,0,0,0.5)] focus-within:ring-2 focus-within:ring-emerald-500/40 motion-reduce:transition-none">
+    <div className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.01] p-4 shadow-[0_1px_0_rgba(255,255,255,0.05)_inset,0_8px_24px_-14px_rgba(0,0,0,0.7)] transition-all duration-200 hover:border-emerald-400/25 hover:from-white/[0.075] motion-reduce:transition-none">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
       <div className="flex items-center justify-between">
-        <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
-        {Icon && <Icon className="size-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" aria-hidden />}
+        <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">{label}</div>
+        {Icon && <Icon className="size-4 text-zinc-600 transition-colors group-hover:text-emerald-400/80" aria-hidden />}
       </div>
-      <div className="mt-2 text-3xl font-semibold text-zinc-100 tabular-nums">{value}</div>
+      <div className="mt-2.5 text-[28px] leading-none font-semibold tracking-tight text-zinc-50 tabular-nums">{value}</div>
       {delta && (
-        <div className={`mt-1 flex items-center gap-1 text-sm ${trendColor}`}>
+        <div className={`mt-2 inline-flex items-center gap-1 text-xs font-medium ${trendColor}`}>
           <TrendIcon className="size-3.5" aria-hidden />
           <span>{delta}</span>
         </div>
@@ -89,15 +90,20 @@ function KpiCard({ label, value, delta, trend, icon: Icon }: KPI) {
 
 function SectionHeader({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
   return (
-    <div className="flex items-center gap-3 border-b border-zinc-800 pb-3 mb-5">
-      <Icon className="size-6 text-zinc-400" aria-hidden />
-      <h2 className="text-xl font-semibold text-zinc-100 tracking-wide">{title}</h2>
+    <div className="flex items-center gap-3 mb-5">
+      <div className="grid size-9 place-items-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-400">
+        <Icon className="size-5" aria-hidden />
+      </div>
+      <h2 className="text-lg font-semibold tracking-tight text-zinc-100">{title}</h2>
+      <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
     </div>
   );
 }
 
-export default async function Dashboard() {
-  const [insights, stats] = await Promise.all([getLatestInsights(), getDashboardStats()]);
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+  const sp = await searchParams;
+  const range = [7, 30, 90].includes(Number(sp.range)) ? Number(sp.range) : 30;
+  const [insights, stats] = await Promise.all([getLatestInsights(), getDashboardStats(range)]);
   const countriesData =
     insights.audience?.countries && insights.audience.countries.length > 0
       ? insights.audience.countries
@@ -114,32 +120,19 @@ export default async function Dashboard() {
   const fmtNum = (n: number) => n.toLocaleString("en-US").replace(/,/g, " ");
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-200">
-      <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-lg font-semibold tracking-tight">Community Dashboard</div>
-            <select
-              className="rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm text-zinc-200 cursor-pointer transition-colors hover:border-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
-              defaultValue="last-pirates"
-            >
-              <option value="last-pirates">Last Pirates: Die Together</option>
-              <option value="ok">OK</option>
-            </select>
+    <div className="min-h-screen text-zinc-200">
+      <header className="sticky top-0 z-20 border-b border-white/[0.07] bg-[#06080c]/70 backdrop-blur-xl">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 text-[#06080c] shadow-[0_0_18px_rgba(16,185,129,0.35)]">
+              <MessagesSquare className="size-4" aria-hidden />
+            </div>
+            <div className="text-base sm:text-lg font-semibold tracking-tight whitespace-nowrap">Community Dashboard</div>
+            <span className="hidden md:inline-flex items-center rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm text-zinc-300 truncate">
+              Last Pirates: Die Together
+            </span>
           </div>
-          <div className="flex items-center gap-3">
-            <select
-              className="rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm text-zinc-200 cursor-pointer transition-colors hover:border-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
-              defaultValue="30d"
-            >
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-            </select>
-            <button className="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 border border-zinc-800 px-3 py-1.5 text-sm text-zinc-200 cursor-pointer transition-colors hover:bg-zinc-800 hover:border-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40">
-              <RefreshCw className="size-3.5" aria-hidden /> Refresh
-            </button>
-          </div>
+          <DashboardControls range={range} />
         </div>
       </header>
 
@@ -149,30 +142,30 @@ export default async function Dashboard() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <KpiCard label="Members" value={live ? fmtNum(d!.members) : "920"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} icon={Users} />
             <KpiCard label="Online now" value={live && d!.online !== null ? fmtNum(d!.online) : "—"} delta={live && d!.online !== null ? "live" : "no data yet"} trend={live && d!.online !== null ? "up" : "flat"} icon={Wifi} />
-            <KpiCard label="Messages" value={live ? fmtNum(d!.messages30d) : "1 548"} delta={live ? "30d" : "demo"} trend={live ? "up" : "flat"} icon={MessageSquare} />
-            <KpiCard label="New members" value={live ? fmtNum(d!.newMembers30d) : "539"} delta={live ? "30d" : "demo"} trend={live ? "up" : "flat"} icon={UserPlus} />
+            <KpiCard label="Messages" value={live ? fmtNum(d!.messages30d) : "1 548"} delta={live ? `${range}d` : "demo"} trend={live ? "up" : "flat"} icon={MessageSquare} />
+            <KpiCard label="New members" value={live ? fmtNum(d!.newMembers30d) : "539"} delta={live ? `${range}d` : "demo"} trend={live ? "up" : "flat"} icon={UserPlus} />
             <KpiCard label="New bugs" value={live ? fmtNum(d!.newBugs7d) : "3"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} icon={Bug} />
             <KpiCard label="New ideas" value={live ? fmtNum(d!.newIdeas7d) : "5"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} icon={Lightbulb} />
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Card title="New members per day" hint={live ? "last 30 days" : "demo"}>
+            <Card title="New members per day" hint={live ? `last ${range} days` : "demo"}>
               <LineChartCard data={live && d!.newMembersPerDay.length > 0 ? d!.newMembersPerDay : discordNewMembersPerDay} color="#34d399" />
             </Card>
-            <Card title="Messages per day" hint={live ? "last 30 days" : "demo"}>
+            <Card title="Messages per day" hint={live ? `last ${range} days` : "demo"}>
               <LineChartCard data={live && d!.messagesPerDay.length > 0 ? d!.messagesPerDay : discordMessagesPerDay} color="#60a5fa" />
             </Card>
             <Card title="Messages by channel" hint={live ? "all time, all channels" : "demo"}>
               <BarChartCard data={live && d!.messagesByChannel.length > 0 ? d!.messagesByChannel : discordMessagesByChannel} horizontal color="#60a5fa" />
             </Card>
 
-            <Card title="New bugs per week" hint="from #sea-bugs">
+            <Card title="New bugs per week" hint="demo · #sea-bugs">
               <BarChartCard data={discordNewBugsPerWeek} color="#f43f5e" />
             </Card>
-            <Card title="New ideas per week" hint="from #your-ideas">
+            <Card title="New ideas per week" hint="demo · #your-ideas">
               <BarChartCard data={discordNewIdeasPerWeek} color="#a78bfa" />
             </Card>
-            <Card title="Activity heatmap" hint="day × hour">
+            <Card title="Activity heatmap" hint="day × hour · demo">
               <Heatmap grid={discordHeatmap} />
             </Card>
 
@@ -182,14 +175,14 @@ export default async function Dashboard() {
             <Card title="Top 5 by reactions" hint={live ? "reactions received, 30d" : "demo"}>
               <BarList data={live && d!.topReactions.length > 0 ? d!.topReactions : discordTopReactions} color="bg-amber-500/70" />
             </Card>
-            <Card title="Retention & activation">
+            <Card title="Retention & activation" hint="demo">
               <div className="grid grid-cols-2 gap-3 h-full">
-                <div className="rounded-lg bg-zinc-900/60 p-3 flex flex-col justify-center">
+                <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 flex flex-col justify-center">
                   <div className="text-xs text-zinc-500 uppercase">Retention W1</div>
                   <div className="text-2xl font-semibold text-zinc-100 mt-1">40.1%</div>
                   <div className="text-xs text-emerald-400 mt-0.5">↑ +2.3%</div>
                 </div>
-                <div className="rounded-lg bg-zinc-900/60 p-3 flex flex-col justify-center">
+                <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 flex flex-col justify-center">
                   <div className="text-xs text-zinc-500 uppercase">Activation</div>
                   <div className="text-2xl font-semibold text-zinc-100 mt-1">22.6%</div>
                   <div className="text-xs text-rose-400 mt-0.5">↓ −1.1%</div>
@@ -277,10 +270,10 @@ export default async function Dashboard() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Card title="Threads per week" hint="last 8 weeks">
+            <Card title="Threads per week" hint="last 8 weeks · demo">
               <BarChartCard data={steamThreadsPerWeek} color="#34d399" />
             </Card>
-            <Card title="Comments per week" hint="last 8 weeks">
+            <Card title="Comments per week" hint="last 8 weeks · demo">
               <BarChartCard data={steamCommentsPerWeek} color="#60a5fa" />
             </Card>
             <Card title="Sub-forum split" hint={live ? "active threads" : "demo"}>
@@ -326,13 +319,13 @@ export default async function Dashboard() {
                 }))}
               />
             </Card>
-            <Card title="Avg time-to-first-reply" hint="last 30 days">
+            <Card title="Avg time-to-first-reply" hint="demo">
               <div className="grid grid-cols-2 gap-3 h-full">
-                <div className="rounded-lg bg-zinc-900/60 p-3 flex flex-col justify-center">
+                <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 flex flex-col justify-center">
                   <div className="text-xs text-zinc-500 uppercase">Any reply</div>
                   <div className="text-2xl font-semibold text-zinc-100 mt-1">3h 42m</div>
                 </div>
-                <div className="rounded-lg bg-zinc-900/60 p-3 flex flex-col justify-center">
+                <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 flex flex-col justify-center">
                   <div className="text-xs text-zinc-500 uppercase">Dev reply</div>
                   <div className="text-2xl font-semibold text-zinc-100 mt-1">11h 8m</div>
                 </div>
@@ -371,7 +364,7 @@ export default async function Dashboard() {
         )}
 
         <footer className="text-center text-xs text-zinc-600 pt-8 pb-4">
-          MVP scaffold · data is mocked · v0.2
+          Community Dashboard · Retro Style Games
         </footer>
       </main>
     </div>

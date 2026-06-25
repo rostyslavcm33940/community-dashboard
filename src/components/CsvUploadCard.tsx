@@ -30,10 +30,10 @@ export function CsvUploadCard({ lastUploadAt }: { lastUploadAt?: string }) {
   }
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 flex flex-col min-h-[220px]">
-      <div className="mb-3">
-        <div className="text-sm font-medium text-zinc-200">Insights CSV</div>
-        <div className="text-xs text-zinc-500 mt-0.5">Growth / Audience / Engagement</div>
+    <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 flex flex-col min-h-[220px] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)]">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <div className="text-sm font-medium text-zinc-100 tracking-tight">Insights CSV</div>
+        <div className="text-[11px] text-zinc-500 shrink-0">Growth / Audience / Engagement</div>
       </div>
       <div
         onClick={() => inputRef.current?.click()}
@@ -43,10 +43,10 @@ export function CsvUploadCard({ lastUploadAt }: { lastUploadAt?: string }) {
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
-        className={`flex-1 border-2 border-dashed rounded-lg p-4 text-center text-xs cursor-pointer transition ${
+        className={`flex-1 grid place-content-center border-2 border-dashed rounded-xl p-4 text-center text-xs cursor-pointer transition ${
           dragOver
-            ? "border-emerald-500 bg-emerald-500/5 text-emerald-300"
-            : "border-zinc-800 text-zinc-500 hover:border-zinc-700"
+            ? "border-emerald-400/60 bg-emerald-400/[0.06] text-emerald-300"
+            : "border-white/10 text-zinc-500 hover:border-white/20 hover:bg-white/[0.02]"
         }`}
       >
         <input
