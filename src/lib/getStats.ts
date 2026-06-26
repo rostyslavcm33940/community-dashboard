@@ -12,13 +12,16 @@ export type DashboardStats = {
     newBugs7d: number;
     newIdeas7d: number;
     messagesByChannel: { name: string; value: number }[];
-    topActive: { name: string; value: number }[];
-    topReactions: { name: string; value: number }[];
+    topActive: { name: string; value: number; avatarUrl: string | null }[];
+    topReactions: { name: string; value: number; avatarUrl: string | null }[];
     messagesPerDay: { date: string; value: number }[];
     newMembersPerDay: { date: string; value: number }[];
-    latestBugs: { title: string; author: string; at: string }[];
-    latestIdeas: { title: string; author: string; at: string }[];
-    topXp: { name: string; xp: number; level: number; messages: number }[];
+    newMembersPerWeek: { date: string; value: number }[];
+    newBugsPerWeek: { date: string; value: number }[];
+    newIdeasPerWeek: { date: string; value: number }[];
+    latestBugs: { title: string; author: string; at: string; href: string | null; avatarUrl: string | null }[];
+    latestIdeas: { title: string; author: string; at: string; href: string | null; avatarUrl: string | null }[];
+    topXp: { name: string; xp: number; level: number; messages: number; avatarUrl: string | null }[];
     topXpTakenAt: string | null;
   };
   steam: {
@@ -27,12 +30,14 @@ export type DashboardStats = {
     newComments7d: number;
     unanswered: number;
     devResponsePct: number;
-    lastThreads: { title: string; author: string; at: string }[];
-    lastComments: { snippet: string; author: string; at: string }[];
-    topHottest: { title: string; replies: number }[];
+    lastThreads: { title: string; author: string; at: string; url: string | null }[];
+    lastComments: { snippet: string; author: string; at: string; url: string | null }[];
+    topHottest: { title: string; replies: number; url: string | null }[];
     topPosters: { name: string; value: number }[];
     pinned: { title: string; replies: number; author: string }[];
     subForumSplit: { name: string; value: number }[];
+    threadsPerWeek: { date: string; value: number }[];
+    commentsPerWeek: { date: string; value: number }[];
   };
   reviews: {
     total: number;
@@ -45,6 +50,8 @@ export type DashboardStats = {
     lastPositive: ReviewRow[];
     lastNegative: ReviewRow[];
     lastBugMentions: ReviewRow[];
+    usefulPositive30d: ReviewRow[];
+    usefulNegative30d: ReviewRow[];
     perDay: { date: string; positive: number; negative: number }[];
   } | null;
 };
@@ -63,11 +70,41 @@ function fmt(d: Date) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function shortDate(iso: string | null | undefined) {
   if (!iso) return "";
   const d = new Date(iso);
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${d.getDate()} ${months[d.getMonth()]}`;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
+function weekBuckets(weeks: number, now: Date) {
+  const out: { label: string; startMs: number; endMs: number }[] = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const end = new Date(now.getTime() - i * 7 * 86400_000);
+    const start = new Date(end.getTime() - 6 * 86400_000);
+    const sameMonth = start.getMonth() === end.getMonth();
+    const label = sameMonth
+      ? `${MONTHS[start.getMonth()]} ${start.getDate()}–${end.getDate()}`
+      : `${MONTHS[start.getMonth()]} ${start.getDate()}–${MONTHS[end.getMonth()]} ${end.getDate()}`;
+    out.push({ label, startMs: start.setHours(0, 0, 0, 0), endMs: end.setHours(23, 59, 59, 999) });
+  }
+  return out;
+}
+
+function bucketByWeek(items: { ts: string | null | undefined }[], buckets: ReturnType<typeof weekBuckets>) {
+  const counts = buckets.map((b) => ({ date: b.label, value: 0 }));
+  for (const it of items) {
+    if (!it.ts) continue;
+    const t = new Date(it.ts).getTime();
+    for (let i = 0; i < buckets.length; i++) {
+      if (t >= buckets[i].startMs && t <= buckets[i].endMs) {
+        counts[i].value++;
+        break;
+      }
+    }
+  }
+  return counts;
 }
 
 async function paginate<T>(makeQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>, pageSize = 1000, maxPages = 100): Promise<T[]> {
@@ -95,14 +132,15 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
   // per-day charts and top contributors. Bug/idea/thread metrics stay fixed at 7d.
   const d30 = new Date(now.getTime() - rangeDays * 86400_000).toISOString();
   const d7 = new Date(now.getTime() - 7 * 86400_000).toISOString();
+  const d56 = new Date(now.getTime() - 56 * 86400_000).toISOString();
 
   try {
     const [
       { count: members },
       { count: messages30d },
       { count: newMembers30d },
-      { data: bugs7dRows },
-      { data: ideas7dRows },
+      { data: bugs8wRows },
+      { data: ideas8wRows },
       { data: allMsg30d },
       { data: activeAuthors },
       { data: latestBugs },
@@ -119,41 +157,78 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       { data: lastBugMentions },
       { data: reviewsForGraph },
       { data: mee6Top },
+      { data: projectRow },
+      { data: steamComments8w },
+      { data: usefulPositive30d },
+      { data: usefulNegative30d },
     ] = await Promise.all([
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).is("left_at", null),
-      supabase.from("discord_messages").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("created_at", d30),
+      supabase.from("discord_messages").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("created_at", d30).not("channel_name", "ilike", "%moderator%"),
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("joined_at", d30),
-      supabase.from("discord_messages").select("id, channel_name, created_at").eq("project_id", 1).gte("created_at", d7).ilike("channel_name", "%bugs%"),
-      supabase.from("discord_messages").select("id, channel_name, created_at").eq("project_id", 1).gte("created_at", d7).ilike("channel_name", "%ideas%"),
-      paginate<{ channel_name: string | null; author_name: string | null; created_at: string | null; reaction_count: number | null }>((from, to) => supabase.from("discord_messages").select("channel_name, author_name, created_at, reaction_count").eq("project_id", 1).gte("created_at", d30).range(from, to)).then((data) => ({ data, error: null })),
+      supabase.from("discord_messages").select("id, channel_name, created_at").eq("project_id", 1).gte("created_at", d56).ilike("channel_name", "%sea-bugs%"),
+      supabase.from("discord_messages").select("id, channel_name, created_at").eq("project_id", 1).gte("created_at", d56).ilike("channel_name", "%your-ideas%"),
+      paginate<{ channel_name: string | null; author_id: string | null; author_name: string | null; created_at: string | null; reaction_count: number | null }>((from, to) => supabase.from("discord_messages").select("channel_name, author_id, author_name, created_at, reaction_count").eq("project_id", 1).gte("created_at", d30).not("channel_name", "ilike", "%moderator%").range(from, to)).then((data) => ({ data, error: null })),
       Promise.resolve({ data: null }),
-      supabase.from("discord_messages").select("content, author_name, created_at, channel_name").eq("project_id", 1).ilike("channel_name", "%bugs%").order("created_at", { ascending: false }).limit(5),
-      supabase.from("discord_messages").select("content, author_name, created_at, channel_name").eq("project_id", 1).ilike("channel_name", "%ideas%").order("created_at", { ascending: false }).limit(5),
+      supabase.from("discord_messages").select("content, author_id, author_name, created_at, channel_name, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%sea-bugs%").order("created_at", { ascending: false }).limit(500),
+      supabase.from("discord_messages").select("content, author_id, author_name, created_at, channel_name, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%your-ideas%").order("created_at", { ascending: false }).limit(500),
       Promise.resolve({ data: null }),
-      supabase.from("discord_members").select("joined_at").eq("project_id", 1).gte("joined_at", d30),
+      supabase.from("discord_members").select("joined_at").eq("project_id", 1).gte("joined_at", new Date(now.getTime() - Math.max(rangeDays, 56) * 86400_000).toISOString()),
       supabase.from("steam_threads").select("*").eq("project_id", 1).order("created_at", { ascending: false }),
-      supabase.from("steam_comments").select("content, author, created_at, is_dev_reply").eq("project_id", 1).order("created_at", { ascending: false }).limit(5),
+      supabase.from("steam_comments").select("content, author, created_at, is_dev_reply, comment_url").eq("project_id", 1).order("created_at", { ascending: false }).limit(5),
       supabase.from("steam_threads").select("title, reply_count, author").eq("project_id", 1).eq("is_pinned", true),
       supabase.from("discord_presence_snapshots").select("online_count, taken_at").eq("project_id", 1).order("taken_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("steam_review_summary").select("*").eq("project_id", 1).maybeSingle(),
-      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug").eq("project_id", 1).eq("voted_up", true).order("timestamp_created", { ascending: false }).limit(5),
-      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug").eq("project_id", 1).eq("voted_up", false).order("timestamp_created", { ascending: false }).limit(5),
-      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug").eq("project_id", 1).eq("mentions_bug", true).order("timestamp_created", { ascending: false }).limit(5),
+      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", true).order("timestamp_created", { ascending: false }).limit(5),
+      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", false).order("timestamp_created", { ascending: false }).limit(5),
+      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("mentions_bug", true).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("timestamp_created, voted_up, mentions_bug").eq("project_id", 1).gte("timestamp_created", new Date(now.getTime() - 90 * 86400_000).toISOString()),
-      supabase.from("mee6_leaderboard").select("username, xp, level, messages, taken_at").eq("project_id", 1).order("xp", { ascending: false }).limit(5),
+      supabase.from("mee6_leaderboard").select("username, xp, level, messages, taken_at").eq("project_id", 1).order("xp", { ascending: false }).limit(10),
+      supabase.from("projects").select("discord_guild_id").eq("id", 1).maybeSingle(),
+      supabase.from("steam_comments").select("created_at").eq("project_id", 1).gte("created_at", d56),
+      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", true).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
+      supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", false).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
     ]);
 
+    const guildId = (projectRow as { discord_guild_id?: string | null } | null)?.discord_guild_id ?? null;
+    function discordUrl(channelId: string | null | undefined, messageId: string | null | undefined): string | null {
+      if (!guildId || !channelId || !messageId) return null;
+      return `https://discord.com/channels/${guildId}/${channelId}/${messageId}`;
+    }
+
+    type MemberRow = { user_id: string; username: string | null; global_name: string | null; nickname: string | null; avatar_url: string | null };
+    const memberRows = await paginate<MemberRow>(
+      (from, to) => supabase.from("discord_members").select("user_id, username, global_name, nickname, avatar_url").eq("project_id", 1).range(from, to)
+    );
+    const memberById = new Map<string, MemberRow>();
+    const memberByUsername = new Map<string, MemberRow>();
+    for (const m of memberRows) {
+      memberById.set(m.user_id, m);
+      if (m.username) memberByUsername.set(m.username, m);
+    }
+    function displayName(m: MemberRow | undefined, fallback: string): string {
+      if (!m) return fallback;
+      return m.nickname || m.global_name || m.username || fallback;
+    }
+    function resolveByAuthor(authorId: string | null | undefined, authorName: string | null | undefined) {
+      const m = (authorId ? memberById.get(authorId) : undefined) ?? (authorName ? memberByUsername.get(authorName) : undefined);
+      return {
+        name: displayName(m, authorName ?? "unknown"),
+        avatarUrl: m?.avatar_url ?? null,
+      };
+    }
+
     const byChannel: Record<string, number> = {};
-    const byAuthor: Record<string, number> = {};
-    const byAuthorReactions: Record<string, number> = {};
+    const byAuthor = new Map<string, { count: number; reactions: number; authorId: string | null; authorName: string }>();
     for (const m of allMsg30d ?? []) {
-      const a = m.author_name ?? "unknown";
-      byAuthor[a] = (byAuthor[a] ?? 0) + 1;
-      byAuthorReactions[a] = (byAuthorReactions[a] ?? 0) + (m.reaction_count ?? 0);
+      const key = m.author_id ?? m.author_name ?? "unknown";
+      const prev = byAuthor.get(key) ?? { count: 0, reactions: 0, authorId: m.author_id ?? null, authorName: m.author_name ?? "unknown" };
+      prev.count++;
+      prev.reactions += m.reaction_count ?? 0;
+      byAuthor.set(key, prev);
     }
 
     const allMsgChannels = await paginate<{ channel_name: string | null }>(
-      (from, to) => supabase.from("discord_messages").select("channel_name").eq("project_id", 1).range(from, to)
+      (from, to) => supabase.from("discord_messages").select("channel_name").eq("project_id", 1).not("channel_name", "ilike", "%moderator%").range(from, to)
     );
     for (const m of allMsgChannels) {
       const c = m.channel_name ?? "unknown";
@@ -167,19 +242,25 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       .sort((a, b) => b.value - a.value);
 
     const EXCLUDED_AUTHORS = new Set(["mee6", "MEE6", "Carl-bot", "carl-bot", "AutoMod"]);
-    const topActive = Object.entries(byAuthor)
-      .map(([name, value]) => ({ name, value }))
-      .filter((r) => !EXCLUDED_AUTHORS.has(r.name))
+    const byAuthorList = [...byAuthor.values()].filter((a) => !EXCLUDED_AUTHORS.has(a.authorName));
+    const topActive = byAuthorList
+      .map((a) => {
+        const r = resolveByAuthor(a.authorId, a.authorName);
+        return { name: r.name, value: a.count, avatarUrl: r.avatarUrl };
+      })
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
 
-    const topReactions = Object.entries(byAuthorReactions)
-      .map(([name, value]) => ({ name, value }))
+    const topReactions = byAuthorList
+      .map((a) => {
+        const r = resolveByAuthor(a.authorId, a.authorName);
+        return { name: r.name, value: a.reactions, avatarUrl: r.avatarUrl };
+      })
+      .filter((x) => x.value > 0)
       .sort((a, b) => b.value - a.value)
-      .slice(0, 5)
-      .filter((x) => x.value > 0);
+      .slice(0, 5);
 
-    const activeAuthorsSet = new Set((allMsg30d ?? []).map((r) => r.author_name).filter(Boolean));
+    const activeAuthorsSet = new Set((allMsg30d ?? []).map((r) => r.author_id ?? r.author_name).filter(Boolean));
 
     const msgDayCounts: Record<string, number> = {};
     for (let i = rangeDays - 1; i >= 0; i--) {
@@ -220,12 +301,13 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       title: t.title ?? "(no title)",
       author: t.author ?? "",
       at: shortDate(t.created_at),
+      url: (t.thread_url as string | null) ?? null,
     }));
 
     const topHottest = [...threads]
       .sort((a, b) => (b.reply_count ?? 0) - (a.reply_count ?? 0))
       .slice(0, 5)
-      .map((t) => ({ title: t.title ?? "(no title)", replies: t.reply_count ?? 0 }));
+      .map((t) => ({ title: t.title ?? "(no title)", replies: t.reply_count ?? 0, url: (t.thread_url as string | null) ?? null }));
 
     const pinned = (pinnedThreads ?? []).map((p) => ({
       title: p.title ?? "(no title)",
@@ -318,9 +400,21 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
         lastPositive: (lastPositive ?? []).map(reviewRow),
         lastNegative: (lastNegative ?? []).map(reviewRow),
         lastBugMentions: (lastBugMentions ?? []).map(reviewRow),
+        usefulPositive30d: (usefulPositive30d ?? []).map(reviewRow),
+        usefulNegative30d: (usefulNegative30d ?? []).map(reviewRow),
         perDay,
       };
     }
+
+    const buckets8w = weekBuckets(8, now);
+    const d7ms = new Date(d7).getTime();
+    const newBugs7d = (bugs8wRows ?? []).filter((r) => r.created_at && new Date(r.created_at).getTime() >= d7ms).length;
+    const newIdeas7d = (ideas8wRows ?? []).filter((r) => r.created_at && new Date(r.created_at).getTime() >= d7ms).length;
+    const newBugsPerWeek = bucketByWeek((bugs8wRows ?? []).map((r) => ({ ts: r.created_at })), buckets8w);
+    const newIdeasPerWeek = bucketByWeek((ideas8wRows ?? []).map((r) => ({ ts: r.created_at })), buckets8w);
+    const newMembersPerWeek = bucketByWeek((memberDays ?? []).map((m) => ({ ts: m.joined_at })), buckets8w);
+    const threadsPerWeek = bucketByWeek((steamThreads ?? []).map((t) => ({ ts: t.created_at })), buckets8w);
+    const commentsPerWeek = bucketByWeek(((steamComments8w ?? []) as { created_at: string | null }[]).map((c) => ({ ts: c.created_at })), buckets8w);
 
     return {
       hasDb: true,
@@ -332,29 +426,52 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
         activeAuthors30d: activeAuthorsSet.size,
         messages30d: messages30d ?? 0,
         newMembers30d: newMembers30d ?? 0,
-        newBugs7d: bugs7dRows?.length ?? 0,
-        newIdeas7d: ideas7dRows?.length ?? 0,
+        newBugs7d,
+        newIdeas7d,
         messagesByChannel,
         topActive,
         topReactions,
         messagesPerDay,
         newMembersPerDay,
-        latestBugs: (latestBugs ?? []).map((m) => ({
-          title: (m.content ?? "").slice(0, 80) || "(no text)",
-          author: m.author_name ?? "",
-          at: shortDate(m.created_at),
-        })),
-        latestIdeas: (latestIdeas ?? []).map((m) => ({
-          title: (m.content ?? "").slice(0, 80) || "(no text)",
-          author: m.author_name ?? "",
-          at: shortDate(m.created_at),
-        })),
-        topXp: ((mee6Top ?? []) as { username: string; xp: number; level: number; messages: number }[]).map((r) => ({
-          name: r.username,
-          xp: r.xp ?? 0,
-          level: r.level ?? 0,
-          messages: r.messages ?? 0,
-        })),
+        newMembersPerWeek,
+        newBugsPerWeek,
+        newIdeasPerWeek,
+        latestBugs: (latestBugs ?? [])
+          .filter((m) => m.message_id && m.channel_id && m.message_id === m.channel_id)
+          .slice(0, 5)
+          .map((m) => {
+            const r = resolveByAuthor(m.author_id, m.author_name);
+            return {
+              title: (m.content ?? "").slice(0, 80) || "(no text)",
+              author: r.name,
+              at: shortDate(m.created_at),
+              href: discordUrl(m.channel_id, m.message_id),
+              avatarUrl: r.avatarUrl,
+            };
+          }),
+        latestIdeas: (latestIdeas ?? [])
+          .filter((m) => m.message_id && m.channel_id && m.message_id === m.channel_id)
+          .slice(0, 5)
+          .map((m) => {
+            const r = resolveByAuthor(m.author_id, m.author_name);
+            return {
+              title: (m.content ?? "").slice(0, 80) || "(no text)",
+              author: r.name,
+              at: shortDate(m.created_at),
+              href: discordUrl(m.channel_id, m.message_id),
+              avatarUrl: r.avatarUrl,
+            };
+          }),
+        topXp: ((mee6Top ?? []) as { username: string; xp: number; level: number; messages: number }[]).map((r) => {
+          const m = memberByUsername.get(r.username);
+          return {
+            name: displayName(m, r.username),
+            xp: r.xp ?? 0,
+            level: r.level ?? 0,
+            messages: r.messages ?? 0,
+            avatarUrl: m?.avatar_url ?? null,
+          };
+        }),
         topXpTakenAt: (mee6Top?.[0] as { taken_at?: string } | undefined)?.taken_at ?? null,
       },
       steam: {
@@ -364,15 +481,21 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
         unanswered,
         devResponsePct,
         lastThreads,
-        lastComments: (lastComments ?? []).map((c) => ({
-          snippet: (c.content ?? "").slice(0, 80) || "(no text)",
-          author: c.author ?? "",
-          at: shortDate(c.created_at),
-        })),
+        lastComments: (lastComments ?? []).map((c) => {
+          const stripped = (c.content ?? "").replace(/^(Originally posted by [^:]+:\s*)+/g, "").trim();
+          return {
+            snippet: stripped.slice(0, 120) || "(no text)",
+            author: c.author ?? "",
+            at: shortDate(c.created_at),
+            url: (c.comment_url as string | null) ?? null,
+          };
+        }),
         topHottest,
         topPosters,
         pinned,
         subForumSplit,
+        threadsPerWeek,
+        commentsPerWeek,
       },
     };
   } catch (e) {

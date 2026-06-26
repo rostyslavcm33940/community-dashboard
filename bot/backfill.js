@@ -17,6 +17,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.MessageContent,
   ],
 });
@@ -26,22 +27,18 @@ client.once("clientReady", async (c) => {
   const guild = await c.guilds.fetch(GUILD_ID);
 
   const channels = await guild.channels.fetch();
-  const textChannels = [...channels.values()].filter(
-    (ch) =>
-      ch &&
-      ch.type === ChannelType.GuildText &&
-      (TRACKED_CHANNEL_IDS.length === 0 || TRACKED_CHANNEL_IDS.includes(ch.id))
-  );
+  const tracked = (ch) => ch && (TRACKED_CHANNEL_IDS.length === 0 || TRACKED_CHANNEL_IDS.includes(ch.id));
+  const textChannels = [...channels.values()].filter((ch) => ch?.type === ChannelType.GuildText && tracked(ch));
+  const forumChannels = [...channels.values()].filter((ch) => ch?.type === ChannelType.GuildForum && tracked(ch));
 
-  console.log(`Backfilling ${textChannels.length} channels (limit ${MAX_PER_CHANNEL}/channel)`);
+  console.log(`Backfilling ${textChannels.length} text + ${forumChannels.length} forum channels (limit ${MAX_PER_CHANNEL}/channel)`);
 
   const members = await guild.members.fetch();
   for (const [, m] of members) await upsertMember(m);
   console.log(`Synced ${members.size} members`);
 
-  for (const ch of textChannels) {
-    await upsertChannel(ch);
-    console.log(`-- #${ch.name}`);
+  async function backfillTextChannel(ch, channelNameOverride) {
+    console.log(`-- #${channelNameOverride ?? ch.name}`);
     let before;
     let fetched = 0;
     while (fetched < MAX_PER_CHANNEL) {
@@ -50,11 +47,31 @@ client.once("clientReady", async (c) => {
         return null;
       });
       if (!batch || batch.size === 0) break;
-      for (const [, m] of batch) await insertMessage(m);
+      for (const [, m] of batch) await insertMessage(m, channelNameOverride);
       fetched += batch.size;
       before = batch.last()?.id;
       console.log(`  ${fetched} messages so far`);
       if (batch.size < FETCH_BATCH) break;
+    }
+  }
+
+  for (const ch of textChannels) {
+    await upsertChannel(ch);
+    await backfillTextChannel(ch);
+  }
+
+  for (const ch of forumChannels) {
+    await upsertChannel(ch);
+    console.log(`== forum #${ch.name} — fetching threads`);
+    const active = await ch.threads.fetchActive().catch(() => null);
+    const archived = await ch.threads.fetchArchived({ limit: 100 }).catch(() => null);
+    const threadList = [
+      ...(active?.threads.values() ?? []),
+      ...(archived?.threads.values() ?? []),
+    ];
+    console.log(`  ${threadList.length} threads in #${ch.name}`);
+    for (const t of threadList) {
+      await backfillTextChannel(t, ch.name);
     }
   }
 

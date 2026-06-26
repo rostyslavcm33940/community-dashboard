@@ -4,13 +4,13 @@ import { BarChartCard } from "@/components/charts/BarChartCard";
 import { PieChartCard } from "@/components/charts/PieChartCard";
 import { BarList } from "@/components/charts/BarList";
 import { ItemList } from "@/components/charts/ItemList";
-import { Heatmap } from "@/components/charts/Heatmap";
 import { CsvUploadCard } from "@/components/CsvUploadCard";
 import { ReviewList } from "@/components/ReviewList";
 import { StackedBarChart } from "@/components/charts/StackedBarChart";
 import { getLatestInsights } from "@/lib/getInsights";
 import { getDashboardStats } from "@/lib/getStats";
 import { DashboardControls } from "@/components/DashboardControls";
+import { DashboardTabs } from "@/components/DashboardTabs";
 import {
   Users,
   Wifi,
@@ -37,7 +37,6 @@ import {
   discordTopReactions,
   discordLatestBugs,
   discordLatestIdeas,
-  discordHeatmap,
   insightsCountries,
   insightsDevices,
   steamThreadsPerWeek,
@@ -137,6 +136,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-12">
+        <DashboardTabs
+          discord={
         <section>
           <SectionHeader icon={MessagesSquare} title="Discord" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -159,16 +160,15 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               <BarChartCard data={live && d!.messagesByChannel.length > 0 ? d!.messagesByChannel : discordMessagesByChannel} horizontal color="#60a5fa" />
             </Card>
 
-            <Card title="New bugs per week" hint="demo · #sea-bugs">
-              <BarChartCard data={discordNewBugsPerWeek} color="#f43f5e" />
+            <Card title="New members per week" hint={live ? "last 8 weeks" : "demo"}>
+              <BarChartCard data={live ? d!.newMembersPerWeek : discordNewMembersPerDay.slice(-8)} color="#34d399" />
             </Card>
-            <Card title="New ideas per week" hint="demo · #your-ideas">
-              <BarChartCard data={discordNewIdeasPerWeek} color="#a78bfa" />
+            <Card title="New bugs per week" hint={live ? "last 8 weeks · #sea-bugs" : "demo · #sea-bugs"}>
+              <BarChartCard data={live ? d!.newBugsPerWeek : discordNewBugsPerWeek} color="#f43f5e" />
             </Card>
-            <Card title="Activity heatmap" hint="day × hour · demo">
-              <Heatmap grid={discordHeatmap} />
+            <Card title="New ideas per week" hint={live ? "last 8 weeks · #your-ideas" : "demo · #your-ideas"}>
+              <BarChartCard data={live ? d!.newIdeasPerWeek : discordNewIdeasPerWeek} color="#a78bfa" />
             </Card>
-
             <Card title="Top 5 active members" hint={live ? "by messages, 30d" : "demo"}>
               <BarList data={live && d!.topActive.length > 0 ? d!.topActive : discordTopActive} color="bg-emerald-500/70" />
             </Card>
@@ -196,6 +196,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   title: b.title,
                   subtitle: `by ${b.author}`,
                   meta: b.at,
+                  href: ("href" in b ? b.href : null) as string | null,
+                  avatarUrl: ("avatarUrl" in b ? b.avatarUrl : null) as string | null,
+                  avatarAlt: b.author,
                 }))}
               />
             </Card>
@@ -205,11 +208,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   title: b.title,
                   subtitle: `by ${b.author}`,
                   meta: b.at,
+                  href: ("href" in b ? b.href : null) as string | null,
+                  avatarUrl: ("avatarUrl" in b ? b.avatarUrl : null) as string | null,
+                  avatarAlt: b.author,
                 }))}
               />
             </Card>
             <Card
-              title="Top 5 by MEE6 XP"
+              title="Top 10 by MEE6 XP"
               hint={
                 live && d!.topXp.length > 0 && d!.topXpTakenAt
                   ? `snapshot · ${new Date(d!.topXpTakenAt).toLocaleDateString()}`
@@ -223,6 +229,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                       <span className="inline-flex size-5 items-center justify-center rounded-full bg-amber-500/10 text-amber-400 text-xs font-medium">
                         {i + 1}
                       </span>
+                      {row.avatarUrl ? (
+                        <img src={row.avatarUrl} alt="" width={20} height={20} className="rounded-full bg-zinc-800 size-5 object-cover" referrerPolicy="no-referrer" />
+                      ) : null}
                       <span className="flex-1 truncate text-zinc-200">{row.name}</span>
                       <span className="text-xs text-zinc-500 tabular-nums">lvl {row.level}</span>
                       <span className="text-xs text-zinc-400 tabular-nums w-16 text-right">
@@ -258,7 +267,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             </div>
           </div>
         </section>
-
+          }
+          steam={
+            <>
         <section>
           <SectionHeader icon={Gamepad2} title="Steam Discussions" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -270,11 +281,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <Card title="Threads per week" hint="last 8 weeks · demo">
-              <BarChartCard data={steamThreadsPerWeek} color="#34d399" />
+            <Card title="Threads per week" hint={live ? "last 8 weeks" : "last 8 weeks · demo"}>
+              <BarChartCard data={live ? s!.threadsPerWeek : steamThreadsPerWeek} color="#34d399" />
             </Card>
-            <Card title="Comments per week" hint="last 8 weeks · demo">
-              <BarChartCard data={steamCommentsPerWeek} color="#60a5fa" />
+            <Card title="Comments per week" hint={live ? "last 8 weeks" : "last 8 weeks · demo"}>
+              <BarChartCard data={live ? s!.commentsPerWeek : steamCommentsPerWeek} color="#60a5fa" />
             </Card>
             <Card title="Sub-forum split" hint={live ? "active threads" : "demo"}>
               <PieChartCard data={live && s!.subForumSplit.length > 0 ? s!.subForumSplit : steamSubForumSplit} />
@@ -286,6 +297,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   title: t.title,
                   subtitle: `by ${t.author}`,
                   meta: t.at,
+                  href: ("url" in t ? t.url : null) as string | null,
                 }))}
               />
             </Card>
@@ -295,6 +307,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   title: c.snippet,
                   subtitle: `by ${c.author}`,
                   meta: c.at,
+                  href: ("url" in c ? c.url : null) as string | null,
                 }))}
               />
             </Card>
@@ -303,6 +316,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 items={(live && s!.topHottest.length > 0 ? s!.topHottest : steamTopHottest).map((t) => ({
                   title: t.title,
                   badge: `${t.replies} replies`,
+                  href: ("url" in t ? t.url : null) as string | null,
                 }))}
               />
             </Card>
@@ -319,24 +333,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 }))}
               />
             </Card>
-            <Card title="Avg time-to-first-reply" hint="demo">
-              <div className="grid grid-cols-2 gap-3 h-full">
-                <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 flex flex-col justify-center">
-                  <div className="text-xs text-zinc-500 uppercase">Any reply</div>
-                  <div className="text-2xl font-semibold text-zinc-100 mt-1">3h 42m</div>
-                </div>
-                <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 flex flex-col justify-center">
-                  <div className="text-xs text-zinc-500 uppercase">Dev reply</div>
-                  <div className="text-2xl font-semibold text-zinc-100 mt-1">11h 8m</div>
-                </div>
-              </div>
-            </Card>
           </div>
         </section>
 
         {r && (
           <section>
-            <SectionHeader icon={Star} title="Steam Reviews (Demo)" />
+            <SectionHeader icon={Star} title="Steam Reviews" />
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <KpiCard label="Total reviews" value={fmtNum(r.total)} delta={r.scoreDesc} trend="flat" icon={Star} />
               <KpiCard label="Positive" value={fmtNum(r.positive)} delta={`${r.positivePct}%`} trend="up" icon={ThumbsUp} />
@@ -359,9 +361,18 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               <Card title="Last 5 negative" hint="newest first">
                 <ReviewList rows={r.lastNegative} kind="negative" />
               </Card>
+              <Card title="Most useful positive" hint="last 30 days · by votes">
+                <ReviewList rows={r.usefulPositive30d} kind="positive" />
+              </Card>
+              <Card title="Most useful negative" hint="last 30 days · by votes">
+                <ReviewList rows={r.usefulNegative30d} kind="negative" />
+              </Card>
             </div>
           </section>
         )}
+            </>
+          }
+        />
 
         <footer className="text-center text-xs text-zinc-600 pt-8 pb-4">
           Community Dashboard · Retro Style Games

@@ -48,11 +48,20 @@ export async function upsertMember(member) {
   const accountCreated = new Date(
     Number((BigInt(member.id) >> 22n) + 1420070400000n)
   ).toISOString();
+  const user = member.user ?? member;
+  const avatarUrl = typeof member.displayAvatarURL === "function"
+    ? member.displayAvatarURL({ size: 64, extension: "png" })
+    : typeof user.displayAvatarURL === "function"
+    ? user.displayAvatarURL({ size: 64, extension: "png" })
+    : null;
   await supabase.from("discord_members").upsert(
     {
       project_id: PROJECT_ID,
       user_id: member.id,
-      username: member.user?.username ?? member.username ?? null,
+      username: user.username ?? null,
+      global_name: user.globalName ?? null,
+      nickname: member.nickname ?? null,
+      avatar_url: avatarUrl,
       joined_at: member.joinedAt?.toISOString() ?? null,
       account_created_at: accountCreated,
     },
@@ -79,18 +88,21 @@ export async function insertPresenceSnapshot(counts) {
   });
 }
 
-export async function insertMessage(msg) {
+export async function insertMessage(msg, channelNameOverride) {
+  // For forum threads we attribute messages to the parent forum channel name
+  // so existing channel-name filters (e.g. ilike "%bugs%") catch them.
+  const parentForumName = msg.channel?.parent?.type === 15 ? msg.channel.parent.name : null;
   await supabase.from("discord_messages").upsert(
     {
       project_id: PROJECT_ID,
       message_id: msg.id,
       channel_id: msg.channelId,
-      channel_name: msg.channel?.name ?? null,
+      channel_name: channelNameOverride ?? parentForumName ?? msg.channel?.name ?? null,
       author_id: msg.author?.id ?? null,
       author_name: msg.author?.username ?? null,
       content: msg.content ?? "",
       created_at: msg.createdAt?.toISOString() ?? new Date().toISOString(),
-      reaction_count: msg.reactions?.cache?.size ?? 0,
+      reaction_count: msg.reactions?.cache?.reduce((sum, r) => sum + (r.count ?? 0), 0) ?? 0,
     },
     { onConflict: "message_id" }
   );

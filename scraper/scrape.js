@@ -76,7 +76,7 @@ async function parseThreadDetail(url) {
       .text()
       .trim();
     const content = $el.find(".commentthread_comment_text").text().trim();
-    const ts = $el.find(".commentthread_comment_timestamp").attr("data-timestamp");
+    const ts = $el.find(".commentthread_comment_timestamp[data-timestamp]").attr("data-timestamp");
     const createdAt = ts ? new Date(parseInt(ts, 10) * 1000).toISOString() : null;
     const isDev = DEV_ACCOUNTS.includes(author.toLowerCase());
 
@@ -89,7 +89,7 @@ async function parseThreadDetail(url) {
     });
   });
 
-  const opTimestamp = $(".forum_op .topicstats_value").last().attr("data-timestamp");
+  const opTimestamp = $(".forum_op .commentthread_comment_timestamp[data-timestamp]").first().attr("data-timestamp");
   const createdAt = opTimestamp
     ? new Date(parseInt(opTimestamp, 10) * 1000).toISOString()
     : null;

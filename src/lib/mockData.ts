@@ -24,10 +24,19 @@ function daySeries(days: number, base: number, variance: number, seed: number): 
 
 function weekSeries(weeks: number, base: number, variance: number, seed: number): Point[] {
   const rand = pseudo(seed);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const today = new Date(2026, 5, 25);
   const out: Point[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
+    const end = new Date(today);
+    end.setDate(today.getDate() - i * 7);
+    const start = new Date(end);
+    start.setDate(end.getDate() - 6);
+    const label = start.getMonth() === end.getMonth()
+      ? `${months[start.getMonth()]} ${start.getDate()}–${end.getDate()}`
+      : `${months[start.getMonth()]} ${start.getDate()}–${months[end.getMonth()]} ${end.getDate()}`;
     const val = Math.max(0, Math.round(base + (rand() - 0.5) * variance * 2));
-    out.push({ date: `W-${i === 0 ? "now" : i}`, value: val });
+    out.push({ date: label, value: val });
   }
   return out;
 }

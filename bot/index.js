@@ -35,8 +35,15 @@ const client = new Client({
 });
 
 function isTracked(channel) {
-  if (TRACKED_CHANNEL_IDS.length === 0) return channel.type === ChannelType.GuildText;
-  return TRACKED_CHANNEL_IDS.includes(channel.id);
+  if (TRACKED_CHANNEL_IDS.length === 0) {
+    return (
+      channel.type === ChannelType.GuildText ||
+      channel.type === ChannelType.PublicThread ||
+      channel.type === ChannelType.PrivateThread ||
+      channel.type === ChannelType.AnnouncementThread
+    );
+  }
+  return TRACKED_CHANNEL_IDS.includes(channel.id) || TRACKED_CHANNEL_IDS.includes(channel.parentId);
 }
 
 client.once(Events.ClientReady, async (c) => {
@@ -47,7 +54,11 @@ client.once(Events.ClientReady, async (c) => {
   const channels = await guild.channels.fetch();
   for (const [, ch] of channels) {
     if (!ch) continue;
-    if (ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildVoice) {
+    if (
+      ch.type === ChannelType.GuildText ||
+      ch.type === ChannelType.GuildVoice ||
+      ch.type === ChannelType.GuildForum
+    ) {
       await upsertChannel(ch);
     }
   }
