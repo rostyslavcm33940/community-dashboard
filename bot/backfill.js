@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { Client, GatewayIntentBits, ChannelType } from "discord.js";
-import { upsertChannel, upsertMember, insertMessage } from "./db.js";
+import { upsertChannel, upsertMember, insertMessage, recordSystemRun } from "./db.js";
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
@@ -75,6 +75,7 @@ client.once("clientReady", async (c) => {
     }
   }
 
+  await recordSystemRun("discord_backfill");
   console.log("Backfill done.");
   client.destroy();
   process.exit(0);

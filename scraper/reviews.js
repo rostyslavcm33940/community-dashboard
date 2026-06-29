@@ -138,6 +138,7 @@ export async function fetchAllReviews() {
     cursor = next;
     await new Promise((r) => setTimeout(r, 1200));
   }
+  await supabase.from("system_runs").insert({ source: "steam_reviews" });
   console.log(`Reviews done. Stored ${total}.`);
   return total;
 }

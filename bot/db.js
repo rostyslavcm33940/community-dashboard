@@ -77,6 +77,10 @@ export async function markMemberLeft(userId) {
     .eq("user_id", userId);
 }
 
+export async function recordSystemRun(source) {
+  await supabase.from("system_runs").insert({ source });
+}
+
 export async function insertPresenceSnapshot(counts) {
   await supabase.from("discord_presence_snapshots").insert({
     project_id: PROJECT_ID,

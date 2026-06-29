@@ -137,6 +137,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-12">
         <DashboardTabs
+          lastRuns={stats?.lastRuns ?? { discordBackfill: null, steamScraper: null, steamReviews: null }}
           discord={
         <section>
           <SectionHeader icon={MessagesSquare} title="Discord" />

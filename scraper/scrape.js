@@ -151,6 +151,7 @@ export async function scrape() {
     }
   }
 
+  await supabase.from("system_runs").insert({ source: "steam_scraper" });
   console.log("Scrape done.");
 }
 

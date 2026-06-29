@@ -2,6 +2,11 @@ import { serverClient } from "./supabase/server";
 
 export type DashboardStats = {
   hasDb: boolean;
+  lastRuns: {
+    discordBackfill: string | null;
+    steamScraper: string | null;
+    steamReviews: string | null;
+  };
   discord: {
     members: number;
     online: number | null;
@@ -161,6 +166,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       { data: steamComments8w },
       { data: usefulPositive30d },
       { data: usefulNegative30d },
+      { data: lastRunsRows },
     ] = await Promise.all([
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).is("left_at", null),
       supabase.from("discord_messages").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("created_at", d30).not("channel_name", "ilike", "%moderator%"),
@@ -187,7 +193,13 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("steam_comments").select("created_at").eq("project_id", 1).gte("created_at", d56),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", true).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", false).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
+      supabase.from("system_runs").select("source, ran_at").order("ran_at", { ascending: false }).limit(50),
     ]);
+
+    const lastBySource = new Map<string, string>();
+    for (const r of (lastRunsRows ?? []) as { source: string; ran_at: string }[]) {
+      if (!lastBySource.has(r.source)) lastBySource.set(r.source, r.ran_at);
+    }
 
     const guildId = (projectRow as { discord_guild_id?: string | null } | null)?.discord_guild_id ?? null;
     function discordUrl(channelId: string | null | undefined, messageId: string | null | undefined): string | null {
@@ -418,6 +430,11 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
 
     return {
       hasDb: true,
+      lastRuns: {
+        discordBackfill: lastBySource.get("discord_backfill") ?? null,
+        steamScraper: lastBySource.get("steam_scraper") ?? null,
+        steamReviews: lastBySource.get("steam_reviews") ?? null,
+      },
       reviews: reviewsBlock,
       discord: {
         members: members ?? 0,
