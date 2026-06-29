@@ -1,0 +1,55 @@
+name: Steam scraper
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: steam-scraper
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: scraper/package-lock.json
+      - working-directory: scraper
+        run: npm ci
+      - working-directory: scraper
+        env:
+          PROJECT_ID: "1"
+          STEAM_APP_ID: "4317790"
+          STEAM_FORUM_URL: "https://steamcommunity.com/app/4317790/discussions/"
+          DEV_ACCOUNTS: "cm.diana,Rostyslav"
+          STEAM_REVIEWS_APP_ID: "4317790"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run once
+
+  reviews:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: scrape
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: scraper/package-lock.json
+      - working-directory: scraper
+        run: npm ci
+      - working-directory: scraper
+        env:
+          PROJECT_ID: "1"
+          STEAM_REVIEWS_APP_ID: "4317790"
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run reviews
