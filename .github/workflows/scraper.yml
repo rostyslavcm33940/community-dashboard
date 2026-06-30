@@ -28,7 +28,7 @@ jobs:
           STEAM_APP_ID: "4317790"
           STEAM_FORUM_URL: "https://steamcommunity.com/app/4317790/discussions/"
           DEV_ACCOUNTS: "cm.diana,Rostyslav"
-          STEAM_REVIEWS_APP_ID: "4317790"
+          STEAM_REVIEWS_APP_ID: "4530130"
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npm run once
@@ -49,7 +49,7 @@ jobs:
       - working-directory: scraper
         env:
           PROJECT_ID: "1"
-          STEAM_REVIEWS_APP_ID: "4317790"
+          STEAM_REVIEWS_APP_ID: "4530130"
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: npm run reviews
