@@ -28,7 +28,7 @@ client.once("clientReady", async (c) => {
 
   const channels = await guild.channels.fetch();
   const tracked = (ch) => ch && (TRACKED_CHANNEL_IDS.length === 0 || TRACKED_CHANNEL_IDS.includes(ch.id));
-  const textChannels = [...channels.values()].filter((ch) => ch?.type === ChannelType.GuildText && tracked(ch));
+  const textChannels = [...channels.values()].filter((ch) => (ch?.type === ChannelType.GuildText || ch?.type === ChannelType.GuildAnnouncement) && tracked(ch));
   const forumChannels = [...channels.values()].filter((ch) => ch?.type === ChannelType.GuildForum && tracked(ch));
 
   console.log(`Backfilling ${textChannels.length} text + ${forumChannels.length} forum channels (limit ${MAX_PER_CHANNEL}/channel)`);

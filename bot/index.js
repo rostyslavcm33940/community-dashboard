@@ -38,6 +38,7 @@ function isTracked(channel) {
   if (TRACKED_CHANNEL_IDS.length === 0) {
     return (
       channel.type === ChannelType.GuildText ||
+      channel.type === ChannelType.GuildAnnouncement ||
       channel.type === ChannelType.PublicThread ||
       channel.type === ChannelType.PrivateThread ||
       channel.type === ChannelType.AnnouncementThread
@@ -57,7 +58,8 @@ client.once(Events.ClientReady, async (c) => {
     if (
       ch.type === ChannelType.GuildText ||
       ch.type === ChannelType.GuildVoice ||
-      ch.type === ChannelType.GuildForum
+      ch.type === ChannelType.GuildForum ||
+      ch.type === ChannelType.GuildAnnouncement
     ) {
       await upsertChannel(ch);
     }
