@@ -170,10 +170,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <Card title="New ideas per week" hint={live ? "last 8 weeks · #your-ideas" : "demo · #your-ideas"}>
               <BarChartCard data={live ? d!.newIdeasPerWeek : discordNewIdeasPerWeek} color="#a78bfa" />
             </Card>
-            <Card title="Top 5 active members" hint={live ? "by messages, 30d" : "demo"}>
+            <Card title="Top 5 active members" hint={live ? `by messages, ${range}d` : "demo"}>
               <BarList data={live && d!.topActive.length > 0 ? d!.topActive : discordTopActive} color="bg-emerald-500/70" />
             </Card>
-            <Card title="Top 5 by reactions" hint={live ? "reactions received, 30d" : "demo"}>
+            <Card title="Top 5 by reactions" hint={live ? `reactions received, ${range}d` : "demo"}>
               <BarList data={live && d!.topReactions.length > 0 ? d!.topReactions : discordTopReactions} color="bg-amber-500/70" />
             </Card>
             <Card title="Retention & activation" hint="demo">
@@ -322,7 +322,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               />
             </Card>
 
-            <Card title="Top 5 posters" hint={live ? "by comments, 30d" : "demo"}>
+            <Card title="Top 5 posters" hint={live ? `by comments, ${range}d` : "demo"}>
               <BarList data={live && s!.topPosters.length > 0 ? s!.topPosters : steamTopPosters} color="bg-blue-500/70" />
             </Card>
             <Card title="Pinned threads tracker" hint={live ? "live" : "demo"}>
