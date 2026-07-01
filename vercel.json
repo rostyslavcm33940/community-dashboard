@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/refresh?source=steam",
+      "schedule": "*/20 * * * *"
+    },
+    {
+      "path": "/api/refresh?source=discord",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
