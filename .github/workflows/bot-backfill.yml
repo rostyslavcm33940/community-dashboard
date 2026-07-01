@@ -1,5 +1,6 @@
 name: Discord backfill
 
+# Runs hourly on the hour.
 on:
   schedule:
     - cron: "0 * * * *"

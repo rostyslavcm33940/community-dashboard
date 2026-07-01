@@ -1,5 +1,6 @@
 name: Steam scraper
 
+# Runs every 20 minutes.
 on:
   schedule:
     - cron: "*/20 * * * *"
