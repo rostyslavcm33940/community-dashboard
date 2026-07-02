@@ -146,8 +146,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <KpiCard label="Online now" value={live && d!.online !== null ? fmtNum(d!.online) : "—"} delta={live && d!.online !== null ? "live" : "no data yet"} trend={live && d!.online !== null ? "up" : "flat"} icon={Wifi} />
             <KpiCard label="Messages" value={live ? fmtNum(d!.messages30d) : "1 548"} delta={live ? `${range}d` : "demo"} trend={live ? "up" : "flat"} icon={MessageSquare} />
             <KpiCard label="New members" value={live ? fmtNum(d!.newMembers30d) : "539"} delta={live ? `${range}d` : "demo"} trend={live ? "up" : "flat"} icon={UserPlus} />
-            <KpiCard label="New bugs" value={live ? fmtNum(d!.newBugs7d) : "3"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} icon={Bug} />
-            <KpiCard label="New ideas" value={live ? fmtNum(d!.newIdeas7d) : "5"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} icon={Lightbulb} />
+            <KpiCard label="New bugs" value={live ? fmtNum(d!.newBugs7d) : "3"} delta={live ? `${range}d` : "demo"} trend={live ? "up" : "flat"} icon={Bug} />
+            <KpiCard label="New ideas" value={live ? fmtNum(d!.newIdeas7d) : "5"} delta={live ? `${range}d` : "demo"} trend={live ? "up" : "flat"} icon={Lightbulb} />
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -275,10 +275,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <SectionHeader icon={Gamepad2} title="Steam Discussions" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <KpiCard label="Active threads" value={live ? fmtNum(s!.activeThreads) : "34"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
-            <KpiCard label="New threads (7d)" value={live ? fmtNum(s!.newThreads7d) : "4"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
-            <KpiCard label="New comments (7d)" value={live ? fmtNum(s!.newComments7d) : "28"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label={`New threads (${range}d)`} value={live ? fmtNum(s!.newThreads7d) : "4"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label={`New comments (${range}d)`} value={live ? fmtNum(s!.newComments7d) : "28"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
             <KpiCard label="Unanswered" value={live ? fmtNum(s!.unanswered) : "2"} delta={live ? "live" : "demo"} trend={live ? "flat" : "flat"} />
-            <KpiCard label="Dev response %" value={live ? `${s!.devResponsePct}%` : "75%"} delta={live ? "7d" : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="Dev response %" value={live ? `${s!.devResponsePct}%` : "75%"} delta={live ? `${range}d` : "demo"} trend={live ? "up" : "flat"} />
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">

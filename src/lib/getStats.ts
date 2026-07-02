@@ -84,15 +84,25 @@ function shortDate(iso: string | null | undefined) {
 }
 
 function weekBuckets(weeks: number, now: Date) {
+  // ISO-style calendar weeks: Monday 00:00 to Sunday 23:59.
+  const day = now.getDay();
+  const daysSinceMonday = day === 0 ? 6 : day - 1;
+  const currentMonday = new Date(now);
+  currentMonday.setDate(now.getDate() - daysSinceMonday);
+  currentMonday.setHours(0, 0, 0, 0);
+
   const out: { label: string; startMs: number; endMs: number }[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
-    const end = new Date(now.getTime() - i * 7 * 86400_000);
-    const start = new Date(end.getTime() - 6 * 86400_000);
+    const start = new Date(currentMonday);
+    start.setDate(currentMonday.getDate() - i * 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
     const sameMonth = start.getMonth() === end.getMonth();
     const label = sameMonth
       ? `${MONTHS[start.getMonth()]} ${start.getDate()}–${end.getDate()}`
       : `${MONTHS[start.getMonth()]} ${start.getDate()}–${MONTHS[end.getMonth()]} ${end.getDate()}`;
-    out.push({ label, startMs: start.setHours(0, 0, 0, 0), endMs: end.setHours(23, 59, 59, 999) });
+    out.push({ label, startMs: start.getTime(), endMs: end.getTime() });
   }
   return out;
 }
@@ -306,8 +316,8 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     }
     const subForumSplit = Object.entries(sub).map(([name, value]) => ({ name, value }));
 
-    const newThreads7d = threads.filter((t) => t.created_at && new Date(t.created_at) > new Date(d7)).length;
-    const unanswered = threads.filter((t) => (t.reply_count ?? 0) === 0 && t.created_at && new Date(t.created_at) > new Date(d7)).length;
+    const newThreads7d = threads.filter((t) => t.created_at && new Date(t.created_at) > new Date(d30)).length;
+    const unanswered = threads.filter((t) => (t.reply_count ?? 0) === 0 && t.created_at && new Date(t.created_at) > new Date(d30)).length;
 
     const lastThreads = threads.slice(0, 5).map((t) => ({
       title: t.title ?? "(no title)",
@@ -331,13 +341,13 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       .from("steam_comments")
       .select("*", { count: "exact", head: true })
       .eq("project_id", 1)
-      .gte("created_at", d7);
+      .gte("created_at", d30);
 
     const { count: devComments } = await supabase
       .from("steam_comments")
       .select("*", { count: "exact", head: true })
       .eq("project_id", 1)
-      .gte("created_at", d7)
+      .gte("created_at", d30)
       .eq("is_dev_reply", true);
 
     const devResponsePct = (totalComments ?? 0) > 0 ? Math.round(((devComments ?? 0) / (totalComments ?? 1)) * 100) : 0;
@@ -419,9 +429,9 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     }
 
     const buckets8w = weekBuckets(8, now);
-    const d7ms = new Date(d7).getTime();
-    const newBugs7d = (bugs8wRows ?? []).filter((r) => r.created_at && new Date(r.created_at).getTime() >= d7ms).length;
-    const newIdeas7d = (ideas8wRows ?? []).filter((r) => r.created_at && new Date(r.created_at).getTime() >= d7ms).length;
+    const dRangeMs = new Date(d30).getTime();
+    const newBugs7d = (bugs8wRows ?? []).filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
+    const newIdeas7d = (ideas8wRows ?? []).filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
     const newBugsPerWeek = bucketByWeek((bugs8wRows ?? []).map((r) => ({ ts: r.created_at })), buckets8w);
     const newIdeasPerWeek = bucketByWeek((ideas8wRows ?? []).map((r) => ({ ts: r.created_at })), buckets8w);
     const newMembersPerWeek = bucketByWeek((memberDays ?? []).map((m) => ({ ts: m.joined_at })), buckets8w);
