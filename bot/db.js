@@ -54,6 +54,24 @@ export async function upsertMember(member) {
     : typeof user.displayAvatarURL === "function"
     ? user.displayAvatarURL({ size: 64, extension: "png" })
     : null;
+
+  const roleNames = member.roles?.cache
+    ? [...member.roles.cache.values()].map((r) => r.name).filter((n) => n && n !== "@everyone")
+    : null;
+  const hasCrow = roleNames?.some((n) => /crow/i.test(n)) ?? false;
+
+  // Preserve existing crow_since if the member already had the role; set NOW()
+  // the first time we see it. Cleared to null if role is removed.
+  const { data: existing } = await supabase
+    .from("discord_members")
+    .select("crow_since")
+    .eq("project_id", PROJECT_ID)
+    .eq("user_id", member.id)
+    .maybeSingle();
+  const crowSince = hasCrow
+    ? existing?.crow_since ?? new Date().toISOString()
+    : null;
+
   await supabase.from("discord_members").upsert(
     {
       project_id: PROJECT_ID,
@@ -64,6 +82,8 @@ export async function upsertMember(member) {
       avatar_url: avatarUrl,
       joined_at: member.joinedAt?.toISOString() ?? null,
       account_created_at: accountCreated,
+      role_names: roleNames,
+      crow_since: crowSince,
     },
     { onConflict: "project_id,user_id" }
   );
