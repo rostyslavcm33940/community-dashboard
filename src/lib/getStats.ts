@@ -29,6 +29,12 @@ export type DashboardStats = {
     topXp: { name: string; xp: number; level: number; messages: number; avatarUrl: string | null }[];
     topXpTakenAt: string | null;
   };
+  qa: {
+    crowCount: number;
+    bugReportsTotal: number;
+    bugReportsInRange: number;
+    newCrowsPerWeek: { date: string; value: number }[];
+  };
   steam: {
     activeThreads: number;
     newThreads7d: number;
@@ -177,6 +183,8 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       { data: usefulPositive30d },
       { data: usefulNegative30d },
       { data: lastRunsRows },
+      { data: bugReportsAll },
+      { data: crowMembers },
     ] = await Promise.all([
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).is("left_at", null),
       supabase.from("discord_messages").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("created_at", d30).not("channel_name", "ilike", "%moderator%"),
@@ -204,6 +212,8 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", true).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", false).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("system_runs").select("source, ran_at").order("ran_at", { ascending: false }).limit(50),
+      supabase.from("discord_messages").select("id, created_at, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%bug-reports%").order("created_at", { ascending: false }).limit(2000),
+      supabase.from("discord_members").select("role_names, crow_since").eq("project_id", 1).is("left_at", null).not("role_names", "is", null),
     ]);
 
     const lastBySource = new Map<string, string>();
@@ -438,6 +448,16 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     const threadsPerWeek = bucketByWeek((steamThreads ?? []).map((t) => ({ ts: t.created_at })), buckets8w);
     const commentsPerWeek = bucketByWeek(((steamComments8w ?? []) as { created_at: string | null }[]).map((c) => ({ ts: c.created_at })), buckets8w);
 
+    // QA track: only thread starters count as bug reports (message_id === channel_id in forums).
+    const bugReportStarters = ((bugReportsAll ?? []) as { created_at: string | null; message_id: string | null; channel_id: string | null }[])
+      .filter((r) => r.message_id && r.channel_id && r.message_id === r.channel_id);
+    const bugReportsTotal = bugReportStarters.length;
+    const bugReportsInRange = bugReportStarters.filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
+
+    const crowRows = (crowMembers ?? []) as { role_names: string[] | null; crow_since: string | null }[];
+    const crowCount = crowRows.filter((m) => m.role_names?.some((n) => /crow/i.test(n))).length;
+    const newCrowsPerWeek = bucketByWeek(crowRows.filter((m) => m.crow_since).map((m) => ({ ts: m.crow_since })), buckets8w);
+
     return {
       hasDb: true,
       lastRuns: {
@@ -523,6 +543,12 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
         subForumSplit,
         threadsPerWeek,
         commentsPerWeek,
+      },
+      qa: {
+        crowCount,
+        bugReportsTotal,
+        bugReportsInRange,
+        newCrowsPerWeek,
       },
     };
   } catch (e) {

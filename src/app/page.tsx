@@ -247,7 +247,38 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             </Card>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-10">
+            <SectionHeader icon={Bug} title="QA Track" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <KpiCard label="Crow role members" value={live ? fmtNum(stats!.qa.crowCount) : "—"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} icon={Users} />
+              <KpiCard label="Bug reports (all-time)" value={live ? fmtNum(stats!.qa.bugReportsTotal) : "—"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} icon={Bug} />
+              <KpiCard label={`Bug reports (${range}d)`} value={live ? fmtNum(stats!.qa.bugReportsInRange) : "—"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} icon={Bug} />
+              <a
+                href="https://lurkr.gg/levels/1451234798461911090"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.05] to-white/[0.01] p-4 shadow-[0_1px_0_rgba(255,255,255,0.05)_inset,0_8px_24px_-14px_rgba(0,0,0,0.7)] transition-all duration-200 hover:border-emerald-400/25 hover:from-white/[0.075] flex flex-col justify-between"
+              >
+                <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Full leaderboard</div>
+                <div className="text-lg font-semibold text-zinc-100">Lurkr →</div>
+                <div className="text-xs text-emerald-400">most active members</div>
+              </a>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card title="New crow-role members per week" hint={live ? "last 8 weeks · tracked from bot install" : "demo"}>
+                <BarChartCard data={live ? stats!.qa.newCrowsPerWeek : []} color="#f59e0b" />
+              </Card>
+              <Card title="How crow role works" hint="info">
+                <div className="text-sm text-zinc-400 leading-relaxed">
+                  <p>MEE6 automatically assigns the <span className="text-emerald-400 font-medium">crow</span> role when a member reaches the qualifying XP level.</p>
+                  <p className="mt-2">The bot tracks when a member is first seen with the role — historical data before bot install is not available.</p>
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          <div className="mt-10">
             <div className="text-sm uppercase tracking-wide text-zinc-500 mb-3">
               CSV Insights — manual upload, weekly
             </div>
