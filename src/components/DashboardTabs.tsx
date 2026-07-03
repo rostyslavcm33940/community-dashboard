@@ -111,7 +111,7 @@ export function DashboardTabs({
         </div>
       </div>
       <p className="text-xs text-zinc-600 mb-6">
-        Background jobs run automatically · Steam every hour · Discord every 4 hours · cron is GitHub Actions
+        Background jobs run automatically · Steam every 15 min · Discord hourly · or hit refresh anytime
       </p>
       <div>{tab === "discord" ? discord : steam}</div>
     </>
