@@ -189,8 +189,8 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).is("left_at", null),
       supabase.from("discord_messages").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("created_at", d30).not("channel_name", "ilike", "%moderator%"),
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("joined_at", d30),
-      supabase.from("discord_messages").select("id, channel_name, created_at").eq("project_id", 1).gte("created_at", d56).ilike("channel_name", "%sea-bugs%"),
-      supabase.from("discord_messages").select("id, channel_name, created_at").eq("project_id", 1).gte("created_at", d56).ilike("channel_name", "%your-ideas%"),
+      supabase.from("discord_messages").select("id, channel_name, created_at, message_id, channel_id").eq("project_id", 1).gte("created_at", d56).ilike("channel_name", "%sea-bugs%"),
+      supabase.from("discord_messages").select("id, channel_name, created_at, message_id, channel_id").eq("project_id", 1).gte("created_at", d56).ilike("channel_name", "%your-ideas%"),
       paginate<{ channel_name: string | null; author_id: string | null; author_name: string | null; created_at: string | null; reaction_count: number | null }>((from, to) => supabase.from("discord_messages").select("channel_name, author_id, author_name, created_at, reaction_count").eq("project_id", 1).gte("created_at", d30).not("channel_name", "ilike", "%moderator%").range(from, to)).then((data) => ({ data, error: null })),
       Promise.resolve({ data: null }),
       supabase.from("discord_messages").select("content, author_id, author_name, created_at, channel_name, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%sea-bugs%").order("created_at", { ascending: false }).limit(500),
@@ -440,10 +440,15 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
 
     const buckets8w = weekBuckets(8, now);
     const dRangeMs = new Date(d30).getTime();
-    const newBugs7d = (bugs8wRows ?? []).filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
-    const newIdeas7d = (ideas8wRows ?? []).filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
-    const newBugsPerWeek = bucketByWeek((bugs8wRows ?? []).map((r) => ({ ts: r.created_at })), buckets8w);
-    const newIdeasPerWeek = bucketByWeek((ideas8wRows ?? []).map((r) => ({ ts: r.created_at })), buckets8w);
+    // Count only thread starters (topics created), not every reply in the thread.
+    const isStarter = (r: { message_id?: string | null; channel_id?: string | null }) =>
+      r.message_id && r.channel_id && r.message_id === r.channel_id;
+    const bugStarters = (bugs8wRows ?? []).filter(isStarter);
+    const ideaStarters = (ideas8wRows ?? []).filter(isStarter);
+    const newBugs7d = bugStarters.filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
+    const newIdeas7d = ideaStarters.filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
+    const newBugsPerWeek = bucketByWeek(bugStarters.map((r) => ({ ts: r.created_at })), buckets8w);
+    const newIdeasPerWeek = bucketByWeek(ideaStarters.map((r) => ({ ts: r.created_at })), buckets8w);
     const newMembersPerWeek = bucketByWeek((memberDays ?? []).map((m) => ({ ts: m.joined_at })), buckets8w);
     const threadsPerWeek = bucketByWeek((steamThreads ?? []).map((t) => ({ ts: t.created_at })), buckets8w);
     const commentsPerWeek = bucketByWeek(((steamComments8w ?? []) as { created_at: string | null }[]).map((c) => ({ ts: c.created_at })), buckets8w);
