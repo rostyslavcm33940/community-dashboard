@@ -60,17 +60,27 @@ export async function upsertMember(member) {
     : null;
   const hasCrow = roleNames?.some((n) => /crow/i.test(n)) ?? false;
 
-  // Preserve existing crow_since if the member already had the role; set NOW()
-  // the first time we see it. Cleared to null if role is removed.
   const { data: existing } = await supabase
     .from("discord_members")
-    .select("crow_since")
+    .select("crow_since, role_names")
     .eq("project_id", PROJECT_ID)
     .eq("user_id", member.id)
     .maybeSingle();
-  const crowSince = hasCrow
-    ? existing?.crow_since ?? new Date().toISOString()
-    : null;
+
+  // Only stamp crow_since on an OBSERVED transition: a member we already tracked,
+  // who did NOT have the crow role before and now does. Bulk backfill of members
+  // who already have the role leaves crow_since null (we don't know the real date).
+  const hadCrowBefore = existing?.role_names?.some((n) => /crow/i.test(n)) ?? false;
+  let crowSince;
+  if (!hasCrow) {
+    crowSince = null;
+  } else if (existing?.crow_since) {
+    crowSince = existing.crow_since; // already recorded
+  } else if (existing && !hadCrowBefore) {
+    crowSince = new Date().toISOString(); // genuine new assignment we witnessed
+  } else {
+    crowSince = null; // first time seeing this member with crow — unknown when
+  }
 
   await supabase.from("discord_members").upsert(
     {

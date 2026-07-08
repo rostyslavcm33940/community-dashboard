@@ -34,6 +34,8 @@ export type DashboardStats = {
     bugReportsTotal: number;
     bugReportsInRange: number;
     newCrowsPerWeek: { date: string; value: number }[];
+    topReporters: { name: string; value: number; avatarUrl: string | null }[];
+    topBugChatters: { name: string; value: number; avatarUrl: string | null }[];
   };
   steam: {
     activeThreads: number;
@@ -212,7 +214,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", true).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", false).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("system_runs").select("source, ran_at").order("ran_at", { ascending: false }).limit(50),
-      supabase.from("discord_messages").select("id, created_at, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%bug-reports%").order("created_at", { ascending: false }).limit(2000),
+      supabase.from("discord_messages").select("id, created_at, message_id, channel_id, author_id, author_name").eq("project_id", 1).ilike("channel_name", "%bug-reports%").order("created_at", { ascending: false }).limit(2000),
       supabase.from("discord_members").select("role_names, crow_since").eq("project_id", 1).is("left_at", null).not("role_names", "is", null),
     ]);
 
@@ -454,10 +456,43 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     const commentsPerWeek = bucketByWeek(((steamComments8w ?? []) as { created_at: string | null }[]).map((c) => ({ ts: c.created_at })), buckets8w);
 
     // QA track: only thread starters count as bug reports (message_id === channel_id in forums).
-    const bugReportStarters = ((bugReportsAll ?? []) as { created_at: string | null; message_id: string | null; channel_id: string | null }[])
-      .filter((r) => r.message_id && r.channel_id && r.message_id === r.channel_id);
+    type BugRow = { created_at: string | null; message_id: string | null; channel_id: string | null; author_id: string | null; author_name: string | null };
+    const bugRows = (bugReportsAll ?? []) as BugRow[];
+    const bugReportStarters = bugRows.filter((r) => r.message_id && r.channel_id && r.message_id === r.channel_id);
     const bugReportsTotal = bugReportStarters.length;
     const bugReportsInRange = bugReportStarters.filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
+
+    // Top bug reporters — by number of bug-report topics created.
+    const reporterCounts = new Map<string, number>();
+    for (const r of bugReportStarters) {
+      const k = r.author_id ?? r.author_name ?? "unknown";
+      reporterCounts.set(k, (reporterCounts.get(k) ?? 0) + 1);
+    }
+    const topReporters = [...reporterCounts.entries()]
+      .map(([k, value]) => {
+        const row = bugReportStarters.find((r) => (r.author_id ?? r.author_name) === k);
+        const res = resolveByAuthor(row?.author_id, row?.author_name);
+        return { name: res.name, value, avatarUrl: res.avatarUrl };
+      })
+      .filter((r) => !EXCLUDED_AUTHORS.has(r.name))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+
+    // Most active in bug-reports — by total messages (topics + replies).
+    const chatterCounts = new Map<string, number>();
+    for (const r of bugRows) {
+      const k = r.author_id ?? r.author_name ?? "unknown";
+      chatterCounts.set(k, (chatterCounts.get(k) ?? 0) + 1);
+    }
+    const topBugChatters = [...chatterCounts.entries()]
+      .map(([k, value]) => {
+        const row = bugRows.find((r) => (r.author_id ?? r.author_name) === k);
+        const res = resolveByAuthor(row?.author_id, row?.author_name);
+        return { name: res.name, value, avatarUrl: res.avatarUrl };
+      })
+      .filter((r) => !EXCLUDED_AUTHORS.has(r.name))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
 
     const crowRows = (crowMembers ?? []) as { role_names: string[] | null; crow_since: string | null }[];
     const crowCount = crowRows.filter((m) => m.role_names?.some((n) => /crow/i.test(n))).length;
@@ -554,6 +589,8 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
         bugReportsTotal,
         bugReportsInRange,
         newCrowsPerWeek,
+        topReporters,
+        topBugChatters,
       },
     };
   } catch (e) {
