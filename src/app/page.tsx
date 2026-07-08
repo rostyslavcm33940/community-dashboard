@@ -292,20 +292,19 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             </div>
 
             <div className="mt-6">
-              <Card title="Full activity leaderboard" hint="Lurkr · live">
-                <div className="rounded-lg overflow-hidden border border-white/[0.06]">
-                  <iframe
-                    src="https://lurkr.gg/levels/1451234798461911090"
-                    title="Lurkr leaderboard"
-                    className="w-full"
-                    style={{ height: 600, border: 0, background: "#0b0d12" }}
-                    loading="lazy"
-                  />
+              <a
+                href="https://lurkr.gg/levels/1451234798461911090"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center justify-between rounded-2xl border border-white/[0.07] bg-gradient-to-r from-emerald-500/[0.08] to-white/[0.02] px-6 py-5 transition-all hover:border-emerald-400/30 hover:from-emerald-500/[0.14]"
+              >
+                <div>
+                  <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Full activity leaderboard</div>
+                  <div className="mt-1 text-lg font-semibold text-zinc-100">Open the complete XP leaderboard on Lurkr</div>
+                  <div className="text-xs text-zinc-500">Lurkr can’t be embedded (blocks framing) — opens in a new tab</div>
                 </div>
-                <a href="https://lurkr.gg/levels/1451234798461911090" target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs text-emerald-400 hover:text-emerald-300">
-                  Open on lurkr.gg →
-                </a>
-              </Card>
+                <div className="text-2xl text-emerald-400 group-hover:translate-x-1 transition-transform">→</div>
+              </a>
             </div>
           </div>
         </section>
