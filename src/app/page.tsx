@@ -181,21 +181,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <Card title="Top 5 by reactions" hint={live ? `reactions received, ${range}d` : "demo"}>
               <BarList data={live && d!.topReactions.length > 0 ? d!.topReactions : discordTopReactions} color="bg-amber-500/70" />
             </Card>
-            <Card title="Retention & activation" hint="demo">
-              <div className="grid grid-cols-2 gap-3 h-full">
-                <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 flex flex-col justify-center">
-                  <div className="text-xs text-zinc-500 uppercase">Retention W1</div>
-                  <div className="text-2xl font-semibold text-zinc-100 mt-1">40.1%</div>
-                  <div className="text-xs text-emerald-400 mt-0.5">↑ +2.3%</div>
-                </div>
-                <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 flex flex-col justify-center">
-                  <div className="text-xs text-zinc-500 uppercase">Activation</div>
-                  <div className="text-2xl font-semibold text-zinc-100 mt-1">22.6%</div>
-                  <div className="text-xs text-rose-400 mt-0.5">↓ −1.1%</div>
-                </div>
-              </div>
-            </Card>
-
             <Card title="Latest bugs" hint={live ? "live" : "demo"}>
               <ItemList
                 items={(live && d!.latestBugs.length > 0 ? d!.latestBugs : discordLatestBugs).map((b) => ({
@@ -290,25 +275,21 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               </Card>
             </div>
 
-            <div className="mt-6">
-              <Card title="New crow-role members per week" hint={live ? "last 8 weeks · new assignments tracked live (existing members not counted)" : "demo"}>
-                <BarChartCard data={live ? stats!.qa.newCrowsPerWeek : []} color="#f59e0b" />
-              </Card>
-            </div>
-
-            <div className="mt-6">
+            <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2">
+                <Card title="New crow-role members per week" hint={live ? "last 8 weeks · new assignments tracked live" : "demo"}>
+                  <BarChartCard data={live ? stats!.qa.newCrowsPerWeek : []} color="#f59e0b" />
+                </Card>
+              </div>
               <a
                 href="https://lurkr.gg/levels/1451234798461911090"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex items-center justify-between rounded-2xl border border-white/[0.07] bg-gradient-to-r from-emerald-500/[0.08] to-white/[0.02] px-6 py-5 transition-all hover:border-emerald-400/30 hover:from-emerald-500/[0.14]"
+                className="group flex flex-col justify-center rounded-2xl border border-white/[0.07] bg-gradient-to-b from-emerald-500/[0.08] to-white/[0.02] p-5 transition-all hover:border-emerald-400/30 hover:from-emerald-500/[0.14]"
               >
-                <div>
-                  <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Full activity leaderboard</div>
-                  <div className="mt-1 text-lg font-semibold text-zinc-100">Open the complete XP leaderboard on Lurkr</div>
-                  <div className="text-xs text-zinc-500">Lurkr can’t be embedded (blocks framing) — opens in a new tab</div>
-                </div>
-                <div className="text-2xl text-emerald-400 group-hover:translate-x-1 transition-transform">→</div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Full leaderboard</div>
+                <div className="mt-1 text-lg font-semibold text-zinc-100 group-hover:text-emerald-300 transition-colors">Lurkr →</div>
+                <div className="mt-1 text-xs text-zinc-500">Complete XP ranking · opens in new tab</div>
               </a>
             </div>
           </div>
