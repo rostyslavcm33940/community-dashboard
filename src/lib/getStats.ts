@@ -59,6 +59,7 @@ export type DashboardStats = {
     negative: number;
     positivePct: number;
     scoreDesc: string;
+    allTimeScoreDesc: string;
     bugMentions7d: number;
     bugMentionsAll: number;
     lastPositive: ReviewRow[];
@@ -403,7 +404,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       const total = summary.total_reviews ?? positive + negative;
       const positivePct = total > 0 ? Math.round((positive / total) * 100) : 0;
 
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 86400_000).getTime();
+      const rangeStart = new Date(now.getTime() - rangeDays * 86400_000).getTime();
       let bugMentions7d = 0;
       let bugMentionsAll = 0;
       const dayBucket: Record<string, { positive: number; negative: number }> = {};
@@ -421,17 +422,32 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
         }
         if (r.mentions_bug) {
           bugMentionsAll++;
-          if (created.getTime() >= sevenDaysAgo) bugMentions7d++;
+          if (created.getTime() >= rangeStart) bugMentions7d++;
         }
       }
       const perDay = Object.entries(dayBucket).map(([date, v]) => ({ date, positive: v.positive, negative: v.negative }));
 
+      // Sentiment for the SELECTED range (not all-time), so it matches the picker.
+      let rPos = 0, rNeg = 0;
+      for (const r of (reviewsForGraph ?? []) as { timestamp_created: string; voted_up: boolean }[]) {
+        if (!r.timestamp_created) continue;
+        if (new Date(r.timestamp_created).getTime() < rangeStart) continue;
+        if (r.voted_up) rPos++; else rNeg++;
+      }
+      const rTotal = rPos + rNeg;
+      const rPct = rTotal > 0 ? Math.round((rPos / rTotal) * 100) : positivePct;
+      // Steam's own rating bands.
+      const label = (pct: number) =>
+        pct >= 80 ? "Very Positive" : pct >= 70 ? "Mostly Positive" : pct >= 40 ? "Mixed" : pct >= 20 ? "Mostly Negative" : "Negative";
+      const rangeScoreDesc = rTotal > 0 ? label(rPct) : (summary.review_score_desc ?? "—");
+
       reviewsBlock = {
         total,
-        positive,
-        negative,
-        positivePct,
-        scoreDesc: summary.review_score_desc ?? "—",
+        positive: rTotal > 0 ? rPos : positive,
+        negative: rTotal > 0 ? rNeg : negative,
+        positivePct: rPct,
+        scoreDesc: rangeScoreDesc,
+        allTimeScoreDesc: summary.review_score_desc ?? "—",
         bugMentions7d,
         bugMentionsAll,
         lastPositive: (lastPositive ?? []).map(reviewRow),

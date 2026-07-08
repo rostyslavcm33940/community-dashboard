@@ -367,11 +367,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <section>
             <SectionHeader icon={Star} title="Steam Reviews" />
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              <KpiCard label="Total reviews" value={fmtNum(r.total)} delta={r.scoreDesc} trend="flat" icon={Star} />
-              <KpiCard label="Positive" value={fmtNum(r.positive)} delta={`${r.positivePct}%`} trend="up" icon={ThumbsUp} />
-              <KpiCard label="Negative" value={fmtNum(r.negative)} delta={`${100 - r.positivePct}%`} trend="down" icon={ThumbsDown} />
-              <KpiCard label="Bug mentions (7d)" value={fmtNum(r.bugMentions7d)} delta={`${r.bugMentionsAll} all-time`} trend={r.bugMentions7d > 0 ? "down" : "flat"} icon={Bug} />
-              <KpiCard label="Score" value={r.scoreDesc} delta="live" trend="flat" icon={Star} />
+              <KpiCard label="Total reviews" value={fmtNum(r.total)} delta={`${r.allTimeScoreDesc} all-time`} trend="flat" icon={Star} />
+              <KpiCard label={`Positive (${range}d)`} value={fmtNum(r.positive)} delta={`${r.positivePct}%`} trend="up" icon={ThumbsUp} />
+              <KpiCard label={`Negative (${range}d)`} value={fmtNum(r.negative)} delta={`${100 - r.positivePct}%`} trend="down" icon={ThumbsDown} />
+              <KpiCard label={`Bug mentions (${range}d)`} value={fmtNum(r.bugMentions7d)} delta={`${r.bugMentionsAll} all-time`} trend={r.bugMentions7d > 0 ? "down" : "flat"} icon={Bug} />
+              <KpiCard label={`Score (${range}d)`} value={r.scoreDesc} delta={`all-time: ${r.allTimeScoreDesc}`} trend="flat" icon={Star} />
             </div>
 
             <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
