@@ -214,7 +214,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", true).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", false).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("system_runs").select("source, ran_at").order("ran_at", { ascending: false }).limit(50),
-      supabase.from("discord_messages").select("id, created_at, message_id, channel_id, author_id, author_name").eq("project_id", 1).ilike("channel_name", "%bug-reports%").order("created_at", { ascending: false }).limit(2000),
+      supabase.from("discord_messages").select("id, created_at, message_id, channel_id, author_id, author_name, channel_name").eq("project_id", 1).or("channel_name.ilike.%bug-reports%,channel_name.ilike.%lobby%").order("created_at", { ascending: false }).limit(3000),
       supabase.from("discord_members").select("role_names, crow_since").eq("project_id", 1).is("left_at", null).not("role_names", "is", null),
     ]);
 
@@ -455,9 +455,11 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     const threadsPerWeek = bucketByWeek((steamThreads ?? []).map((t) => ({ ts: t.created_at })), buckets8w);
     const commentsPerWeek = bucketByWeek(((steamComments8w ?? []) as { created_at: string | null }[]).map((c) => ({ ts: c.created_at })), buckets8w);
 
-    // QA track: only thread starters count as bug reports (message_id === channel_id in forums).
-    type BugRow = { created_at: string | null; message_id: string | null; channel_id: string | null; author_id: string | null; author_name: string | null };
-    const bugRows = (bugReportsAll ?? []) as BugRow[];
+    // QA track. bugReportsAll spans bug-reports + the Lobby thread (for the
+    // "most active" metric). Bug-report counts use the bug-reports channel only.
+    type BugRow = { created_at: string | null; message_id: string | null; channel_id: string | null; author_id: string | null; author_name: string | null; channel_name: string | null };
+    const qaRows = (bugReportsAll ?? []) as BugRow[];
+    const bugRows = qaRows.filter((r) => /bug-reports/i.test(r.channel_name ?? ""));
     const bugReportStarters = bugRows.filter((r) => r.message_id && r.channel_id && r.message_id === r.channel_id);
     const bugReportsTotal = bugReportStarters.length;
     const bugReportsInRange = bugReportStarters.filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
@@ -478,15 +480,15 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
 
-    // Most active in bug-reports — by total messages (topics + replies).
+    // Most active — total messages across bug-reports + the Lobby thread.
     const chatterCounts = new Map<string, number>();
-    for (const r of bugRows) {
+    for (const r of qaRows) {
       const k = r.author_id ?? r.author_name ?? "unknown";
       chatterCounts.set(k, (chatterCounts.get(k) ?? 0) + 1);
     }
     const topBugChatters = [...chatterCounts.entries()]
       .map(([k, value]) => {
-        const row = bugRows.find((r) => (r.author_id ?? r.author_name) === k);
+        const row = qaRows.find((r) => (r.author_id ?? r.author_name) === k);
         const res = resolveByAuthor(row?.author_id, row?.author_name);
         return { name: res.name, value, avatarUrl: res.avatarUrl };
       })

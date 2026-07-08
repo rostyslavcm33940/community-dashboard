@@ -280,7 +280,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               <Card title="Top bug reporters" hint={live ? "by bug-report topics created" : "demo"}>
                 <BarList data={live && stats!.qa.topReporters.length > 0 ? stats!.qa.topReporters : []} color="bg-rose-500/70" />
               </Card>
-              <Card title="Most active in bug-reports" hint={live ? "by total messages" : "demo"}>
+              <Card title="Most active in QA" hint={live ? "messages in bug-reports + Lobby" : "demo"}>
                 <BarList data={live && stats!.qa.topBugChatters.length > 0 ? stats!.qa.topBugChatters : []} color="bg-amber-500/70" />
               </Card>
             </div>

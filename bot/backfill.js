@@ -58,6 +58,21 @@ client.once("clientReady", async (c) => {
   for (const ch of textChannels) {
     await upsertChannel(ch);
     await backfillTextChannel(ch);
+
+    // Text channels can have threads (e.g. the "Lobby" thread in crows-nest).
+    // Backfill them too, storing each thread's own name as channel_name.
+    const active = await ch.threads.fetchActive().catch(() => null);
+    const archived = await ch.threads.fetchArchived({ limit: 100 }).catch(() => null);
+    const threadList = [
+      ...(active?.threads.values() ?? []),
+      ...(archived?.threads.values() ?? []),
+    ];
+    if (threadList.length > 0) {
+      console.log(`  ${threadList.length} thread(s) in #${ch.name}`);
+      for (const t of threadList) {
+        await backfillTextChannel(t, t.name);
+      }
+    }
   }
 
   for (const ch of forumChannels) {
