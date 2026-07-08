@@ -275,6 +275,21 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               </Card>
             </div>
 
+            <div className="mt-6">
+              <Card title="Latest bug reports" hint={live ? "newest first · #bug-reports" : "demo"}>
+                <ItemList
+                  items={(live ? stats!.qa.latestBugReports : []).map((b) => ({
+                    title: b.title,
+                    subtitle: `by ${b.author}`,
+                    meta: b.at,
+                    href: b.href,
+                    avatarUrl: b.avatarUrl,
+                    avatarAlt: b.author,
+                  }))}
+                />
+              </Card>
+            </div>
+
             <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2">
                 <Card title="New crow-role members per week" hint={live ? "last 8 weeks · new assignments tracked live" : "demo"}>

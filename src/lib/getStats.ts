@@ -37,6 +37,7 @@ export type DashboardStats = {
     newCrowsPerWeek: { date: string; value: number }[];
     topReporters: { name: string; value: number; avatarUrl: string | null }[];
     topBugChatters: { name: string; value: number; avatarUrl: string | null }[];
+    latestBugReports: { title: string; author: string; at: string; href: string | null; avatarUrl: string | null }[];
   };
   steam: {
     activeThreads: number;
@@ -217,7 +218,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", true).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", false).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("system_runs").select("source, ran_at").order("ran_at", { ascending: false }).limit(50),
-      supabase.from("discord_messages").select("id, created_at, message_id, channel_id, author_id, author_name, channel_name").eq("project_id", 1).or("channel_name.ilike.%bug-reports%,channel_name.ilike.%lobby%").order("created_at", { ascending: false }).limit(3000),
+      supabase.from("discord_messages").select("id, created_at, message_id, channel_id, author_id, author_name, channel_name, content").eq("project_id", 1).or("channel_name.ilike.%bug-reports%,channel_name.ilike.%lobby%").order("created_at", { ascending: false }).limit(3000),
       supabase.from("discord_members").select("role_names, crow_since").eq("project_id", 1).is("left_at", null).not("role_names", "is", null),
       supabase.from("discord_members").select("left_at").eq("project_id", 1).gte("left_at", new Date(now.getTime() - Math.max(rangeDays, 56) * 86400_000).toISOString()),
     ]);
@@ -478,12 +479,24 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
 
     // QA track. bugReportsAll spans bug-reports + the Lobby thread (for the
     // "most active" metric). Bug-report counts use the bug-reports channel only.
-    type BugRow = { created_at: string | null; message_id: string | null; channel_id: string | null; author_id: string | null; author_name: string | null; channel_name: string | null };
+    type BugRow = { created_at: string | null; message_id: string | null; channel_id: string | null; author_id: string | null; author_name: string | null; channel_name: string | null; content: string | null };
     const qaRows = (bugReportsAll ?? []) as BugRow[];
     const bugRows = qaRows.filter((r) => /bug-reports/i.test(r.channel_name ?? ""));
     const bugReportStarters = bugRows.filter((r) => r.message_id && r.channel_id && r.message_id === r.channel_id);
     const bugReportsTotal = bugReportStarters.length;
     const bugReportsInRange = bugReportStarters.filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
+
+    // Latest 5 bug reports (thread starters), newest first, with Discord deep-link.
+    const latestBugReports = bugReportStarters.slice(0, 5).map((m) => {
+      const res = resolveByAuthor(m.author_id, m.author_name);
+      return {
+        title: (m.content ?? "").slice(0, 80) || "(no text)",
+        author: res.name,
+        at: shortDate(m.created_at),
+        href: discordUrl(m.channel_id, m.message_id),
+        avatarUrl: res.avatarUrl,
+      };
+    });
 
     // Top bug reporters — by number of bug-report topics created.
     const reporterCounts = new Map<string, number>();
@@ -615,6 +628,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
         newCrowsPerWeek,
         topReporters,
         topBugChatters,
+        latestBugReports,
       },
     };
   } catch (e) {
