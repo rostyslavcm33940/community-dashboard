@@ -67,19 +67,28 @@ export async function upsertMember(member) {
     .eq("user_id", member.id)
     .maybeSingle();
 
-  // Only stamp crow_since on an OBSERVED transition: a member we already tracked,
-  // who did NOT have the crow role before and now does. Bulk backfill of members
-  // who already have the role leaves crow_since null (we don't know the real date).
+  const joinedAt = member.joinedAt?.toISOString() ?? null;
+
+  // Estimate crow_since for members whose real assignment date we never observed.
+  // QA recruitment happened in two reaction waves; approximate by join date.
+  const estimateCrowSince = () => {
+    if (!joinedAt) return "2026-05-26T20:25:00+00:00";
+    const t = new Date(joinedAt).getTime();
+    if (t <= new Date("2026-05-27").getTime()) return "2026-05-26T20:25:00+00:00";
+    if (t <= new Date("2026-06-20").getTime()) return "2026-06-19T20:32:00+00:00";
+    return joinedAt; // joined after both waves — role obtained around join time
+  };
+
   const hadCrowBefore = existing?.role_names?.some((n) => /crow/i.test(n)) ?? false;
   let crowSince;
   if (!hasCrow) {
     crowSince = null;
   } else if (existing?.crow_since) {
-    crowSince = existing.crow_since; // already recorded
+    crowSince = existing.crow_since; // already recorded — keep
   } else if (existing && !hadCrowBefore) {
     crowSince = new Date().toISOString(); // genuine new assignment we witnessed
   } else {
-    crowSince = null; // first time seeing this member with crow — unknown when
+    crowSince = estimateCrowSince(); // first sight with crow — approximate
   }
 
   await supabase.from("discord_members").upsert(
@@ -109,6 +118,28 @@ export async function markMemberLeft(userId) {
 
 export async function recordSystemRun(source) {
   await supabase.from("system_runs").insert({ source });
+}
+
+// Mark members who are no longer in the guild as left. Called after a full member
+// sync: any tracked member (left_at null) not in the current guild set has left.
+export async function markLeftMembers(activeUserIds) {
+  const activeSet = new Set(activeUserIds);
+  const { data: tracked } = await supabase
+    .from("discord_members")
+    .select("user_id")
+    .eq("project_id", PROJECT_ID)
+    .is("left_at", null);
+  const gone = (tracked ?? []).filter((m) => !activeSet.has(m.user_id)).map((m) => m.user_id);
+  const now = new Date().toISOString();
+  for (const uid of gone) {
+    await supabase.from("discord_members").update({ left_at: now }).eq("project_id", PROJECT_ID).eq("user_id", uid);
+  }
+  return gone.length;
+}
+
+// Store Discord's authoritative member count (guild.memberCount) for the KPI.
+export async function recordGuildStats(memberCount) {
+  await supabase.from("projects").update({ member_count: memberCount }).eq("id", PROJECT_ID);
 }
 
 export async function insertPresenceSnapshot(counts) {

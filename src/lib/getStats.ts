@@ -22,6 +22,7 @@ export type DashboardStats = {
     messagesPerDay: { date: string; value: number }[];
     newMembersPerDay: { date: string; value: number }[];
     newMembersPerWeek: { date: string; value: number }[];
+    membersFlowPerWeek: { date: string; joined: number; left: number }[];
     newBugsPerWeek: { date: string; value: number }[];
     newIdeasPerWeek: { date: string; value: number }[];
     latestBugs: { title: string; author: string; at: string; href: string | null; avatarUrl: string | null }[];
@@ -187,6 +188,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       { data: lastRunsRows },
       { data: bugReportsAll },
       { data: crowMembers },
+      { data: leftMembers },
     ] = await Promise.all([
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).is("left_at", null),
       supabase.from("discord_messages").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("created_at", d30).not("channel_name", "ilike", "%moderator%"),
@@ -209,13 +211,14 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("mentions_bug", true).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("timestamp_created, voted_up, mentions_bug").eq("project_id", 1).gte("timestamp_created", new Date(now.getTime() - 90 * 86400_000).toISOString()),
       supabase.from("mee6_leaderboard").select("username, xp, level, messages, taken_at").eq("project_id", 1).order("xp", { ascending: false }).limit(10),
-      supabase.from("projects").select("discord_guild_id").eq("id", 1).maybeSingle(),
+      supabase.from("projects").select("discord_guild_id, member_count").eq("id", 1).maybeSingle(),
       supabase.from("steam_comments").select("created_at").eq("project_id", 1).gte("created_at", d56),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", true).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", false).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("system_runs").select("source, ran_at").order("ran_at", { ascending: false }).limit(50),
       supabase.from("discord_messages").select("id, created_at, message_id, channel_id, author_id, author_name, channel_name").eq("project_id", 1).or("channel_name.ilike.%bug-reports%,channel_name.ilike.%lobby%").order("created_at", { ascending: false }).limit(3000),
       supabase.from("discord_members").select("role_names, crow_since").eq("project_id", 1).is("left_at", null).not("role_names", "is", null),
+      supabase.from("discord_members").select("left_at").eq("project_id", 1).gte("left_at", new Date(now.getTime() - Math.max(rangeDays, 56) * 86400_000).toISOString()),
     ]);
 
     const lastBySource = new Map<string, string>();
@@ -452,6 +455,8 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     const newBugsPerWeek = bucketByWeek(bugStarters.map((r) => ({ ts: r.created_at })), buckets8w);
     const newIdeasPerWeek = bucketByWeek(ideaStarters.map((r) => ({ ts: r.created_at })), buckets8w);
     const newMembersPerWeek = bucketByWeek((memberDays ?? []).map((m) => ({ ts: m.joined_at })), buckets8w);
+    const leftPerWeek = bucketByWeek(((leftMembers ?? []) as { left_at: string | null }[]).map((m) => ({ ts: m.left_at })), buckets8w);
+    const membersFlowPerWeek = newMembersPerWeek.map((j, i) => ({ date: j.date, joined: j.value, left: leftPerWeek[i]?.value ?? 0 }));
     const threadsPerWeek = bucketByWeek((steamThreads ?? []).map((t) => ({ ts: t.created_at })), buckets8w);
     const commentsPerWeek = bucketByWeek(((steamComments8w ?? []) as { created_at: string | null }[]).map((c) => ({ ts: c.created_at })), buckets8w);
 
@@ -509,7 +514,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       },
       reviews: reviewsBlock,
       discord: {
-        members: members ?? 0,
+        members: (projectRow as { member_count?: number | null } | null)?.member_count ?? members ?? 0,
         online: (presenceLatest as { online_count?: number | null } | null)?.online_count ?? null,
         onlineTakenAt: (presenceLatest as { taken_at?: string | null } | null)?.taken_at ?? null,
         activeAuthors30d: activeAuthorsSet.size,
@@ -523,6 +528,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
         messagesPerDay,
         newMembersPerDay,
         newMembersPerWeek,
+        membersFlowPerWeek,
         newBugsPerWeek,
         newIdeasPerWeek,
         latestBugs: (latestBugs ?? [])

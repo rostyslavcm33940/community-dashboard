@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { Client, GatewayIntentBits, ChannelType } from "discord.js";
-import { upsertChannel, upsertMember, insertMessage, recordSystemRun } from "./db.js";
+import { upsertChannel, upsertMember, insertMessage, recordSystemRun, markLeftMembers, recordGuildStats } from "./db.js";
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
@@ -36,6 +36,14 @@ client.once("clientReady", async (c) => {
   const members = await guild.members.fetch();
   for (const [, m] of members) await upsertMember(m);
   console.log(`Synced ${members.size} members`);
+
+  // Members no longer present have left — mark them (backfill has no live leave events).
+  const leftCount = await markLeftMembers([...members.keys()]);
+  console.log(`Marked ${leftCount} members as left`);
+
+  // Store Discord's authoritative member count for the KPI.
+  await recordGuildStats(guild.memberCount);
+  console.log(`Guild member count: ${guild.memberCount}`);
 
   async function backfillTextChannel(ch, channelNameOverride) {
     console.log(`-- #${channelNameOverride ?? ch.name}`);

@@ -1,6 +1,7 @@
 import { Card } from "@/components/Card";
 import { LineChartCard } from "@/components/charts/LineChartCard";
 import { BarChartCard } from "@/components/charts/BarChartCard";
+import { MembersFlowChart } from "@/components/charts/MembersFlowChart";
 import { PieChartCard } from "@/components/charts/PieChartCard";
 import { BarList } from "@/components/charts/BarList";
 import { ItemList } from "@/components/charts/ItemList";
@@ -161,8 +162,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               <BarChartCard data={live && d!.messagesByChannel.length > 0 ? d!.messagesByChannel : discordMessagesByChannel} horizontal color="#60a5fa" />
             </Card>
 
-            <Card title="New members per week" hint={live ? "last 8 weeks" : "demo"}>
-              <BarChartCard data={live ? d!.newMembersPerWeek : discordNewMembersPerDay.slice(-8)} color="#34d399" />
+            <Card title="Members joined vs left per week" hint={live ? "last 8 weeks · net growth" : "demo"}>
+              {live ? (
+                <MembersFlowChart data={d!.membersFlowPerWeek} />
+              ) : (
+                <BarChartCard data={discordNewMembersPerDay.slice(-8)} color="#34d399" />
+              )}
             </Card>
             <Card title="New bugs per week" hint={live ? "last 8 weeks · #sea-bugs" : "demo · #sea-bugs"}>
               <BarChartCard data={live ? d!.newBugsPerWeek : discordNewBugsPerWeek} color="#f43f5e" />
