@@ -472,7 +472,16 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     const newBugsPerWeek = bucketByWeek(bugStarters.map((r) => ({ ts: r.created_at })), buckets8w);
     const newIdeasPerWeek = bucketByWeek(ideaStarters.map((r) => ({ ts: r.created_at })), buckets8w);
     const newMembersPerWeek = bucketByWeek((memberDays ?? []).map((m) => ({ ts: m.joined_at })), buckets8w);
-    const leftPerWeek = bucketByWeek(((leftMembers ?? []) as { left_at: string | null }[]).map((m) => ({ ts: m.left_at })), buckets8w);
+    // The first backfill stamped left_at=NOW for every member already gone before
+    // tracking existed (a one-off lump). Only chart leaves observed from this cutoff
+    // onward so the past bulk-detection isn't shown as this week's churn.
+    const LEAVES_TRACKED_SINCE = new Date("2026-07-09T00:00:00Z").getTime();
+    const leftPerWeek = bucketByWeek(
+      ((leftMembers ?? []) as { left_at: string | null }[])
+        .filter((m) => m.left_at && new Date(m.left_at).getTime() >= LEAVES_TRACKED_SINCE)
+        .map((m) => ({ ts: m.left_at })),
+      buckets8w
+    );
     const membersFlowPerWeek = newMembersPerWeek.map((j, i) => ({ date: j.date, joined: j.value, left: leftPerWeek[i]?.value ?? 0 }));
     const threadsPerWeek = bucketByWeek((steamThreads ?? []).map((t) => ({ ts: t.created_at })), buckets8w);
     const commentsPerWeek = bucketByWeek(((steamComments8w ?? []) as { created_at: string | null }[]).map((c) => ({ ts: c.created_at })), buckets8w);
