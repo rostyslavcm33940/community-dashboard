@@ -53,6 +53,7 @@ export type DashboardStats = {
     subForumSplit: { name: string; value: number }[];
     threadsPerWeek: { date: string; value: number }[];
     commentsPerWeek: { date: string; value: number }[];
+    unansweredThreads: { title: string; author: string; at: string; url: string | null; note: string | null }[];
   };
   reviews: {
     total: number;
@@ -191,6 +192,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       { data: bugReportsAll },
       { data: crowMembers },
       { data: leftMembers },
+      { data: threadNotes },
     ] = await Promise.all([
       supabase.from("discord_members").select("*", { count: "exact", head: true }).eq("project_id", 1).is("left_at", null),
       supabase.from("discord_messages").select("*", { count: "exact", head: true }).eq("project_id", 1).gte("created_at", d30).not("channel_name", "ilike", "%moderator%"),
@@ -221,6 +223,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("discord_messages").select("id, created_at, message_id, channel_id, author_id, author_name, channel_name, content").eq("project_id", 1).or("channel_name.ilike.%bug-reports%,channel_name.ilike.%lobby%").order("created_at", { ascending: false }).limit(3000),
       supabase.from("discord_members").select("role_names, crow_since").eq("project_id", 1).is("left_at", null).not("role_names", "is", null),
       supabase.from("discord_members").select("left_at").eq("project_id", 1).gte("left_at", new Date(now.getTime() - Math.max(rangeDays, 56) * 86400_000).toISOString()),
+      supabase.from("steam_thread_notes").select("thread_url, note").eq("project_id", 1),
     ]);
 
     const lastBySource = new Map<string, string>();
@@ -334,7 +337,21 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     const subForumSplit = Object.entries(sub).map(([name, value]) => ({ name, value }));
 
     const newThreads7d = threads.filter((t) => t.created_at && new Date(t.created_at) > new Date(d30)).length;
-    const unanswered = threads.filter((t) => (t.reply_count ?? 0) === 0 && t.created_at && new Date(t.created_at) > new Date(d30)).length;
+    const unansweredList = threads.filter((t) => (t.reply_count ?? 0) === 0 && !t.is_pinned && t.created_at && new Date(t.created_at) > new Date(d30));
+    const unanswered = unansweredList.length;
+    const noteByUrl = new Map<string, string>();
+    for (const n of (threadNotes ?? []) as { thread_url: string; note: string | null }[]) {
+      if (n.note) noteByUrl.set(n.thread_url, n.note);
+    }
+    const unansweredThreads = unansweredList
+      .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+      .map((t) => ({
+        title: (t.title ?? "(no title)").replace(/^PINNED:\s*/i, "").trim(),
+        author: t.author ?? "",
+        at: shortDate(t.created_at),
+        url: (t.thread_url as string | null) ?? null,
+        note: t.thread_url ? noteByUrl.get(t.thread_url) ?? null : null,
+      }));
 
     const lastThreads = threads.slice(0, 5).map((t) => ({
       title: t.title ?? "(no title)",
@@ -629,6 +646,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
         subForumSplit,
         threadsPerWeek,
         commentsPerWeek,
+        unansweredThreads,
       },
       qa: {
         crowCount,

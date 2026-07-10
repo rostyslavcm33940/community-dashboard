@@ -12,6 +12,7 @@ import { getLatestInsights } from "@/lib/getInsights";
 import { getDashboardStats } from "@/lib/getStats";
 import { DashboardControls } from "@/components/DashboardControls";
 import { DashboardTabs } from "@/components/DashboardTabs";
+import { UnansweredThreads } from "@/components/UnansweredThreads";
 import {
   Users,
   Wifi,
@@ -374,6 +375,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   badge: `${p.replies} replies`,
                 }))}
               />
+            </Card>
+          </div>
+
+          <div className="mt-4">
+            <Card title="Unanswered threads" hint={live ? "0 replies · add a note why" : "demo"}>
+              <UnansweredThreads threads={live ? s!.unansweredThreads : []} />
             </Card>
           </div>
         </section>
