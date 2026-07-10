@@ -377,14 +377,17 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       .eq("project_id", 1)
       .gte("created_at", d30);
 
-    const { count: devComments } = await supabase
+    // Dev response rate = share of threads (created in range) that got at least
+    // one dev reply — a real "did the team respond" metric, not comment volume.
+    const { data: devReplyRows } = await supabase
       .from("steam_comments")
-      .select("*", { count: "exact", head: true })
+      .select("thread_id")
       .eq("project_id", 1)
-      .gte("created_at", d30)
       .eq("is_dev_reply", true);
-
-    const devResponsePct = (totalComments ?? 0) > 0 ? Math.round(((devComments ?? 0) / (totalComments ?? 1)) * 100) : 0;
+    const threadsWithDevReply = new Set((devReplyRows ?? []).map((r) => r.thread_id).filter((id) => id != null));
+    const threadsInRange = threads.filter((t) => t.created_at && new Date(t.created_at) > new Date(d30) && !t.is_pinned);
+    const answeredByDev = threadsInRange.filter((t) => threadsWithDevReply.has(t.id)).length;
+    const devResponsePct = threadsInRange.length > 0 ? Math.round((answeredByDev / threadsInRange.length) * 100) : 0;
 
     const { data: posterRows } = await supabase
       .from("steam_comments")

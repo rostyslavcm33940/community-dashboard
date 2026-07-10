@@ -43,7 +43,6 @@ import {
   insightsDevices,
   steamThreadsPerWeek,
   steamCommentsPerWeek,
-  steamSubForumSplit,
   steamLastThreads,
   steamLastComments,
   steamTopHottest,
@@ -320,18 +319,15 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <KpiCard label={`New threads (${range}d)`} value={live ? fmtNum(s!.newThreads7d) : "4"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
             <KpiCard label={`New comments (${range}d)`} value={live ? fmtNum(s!.newComments7d) : "28"} delta={live ? "live" : "demo"} trend={live ? "up" : "flat"} />
             <KpiCard label="Unanswered" value={live ? fmtNum(s!.unanswered) : "2"} delta={live ? "live" : "demo"} trend={live ? "flat" : "flat"} />
-            <KpiCard label="Dev response %" value={live ? `${s!.devResponsePct}%` : "75%"} delta={live ? `${range}d` : "demo"} trend={live ? "up" : "flat"} />
+            <KpiCard label="Dev response %" value={live ? `${s!.devResponsePct}%` : "75%"} delta={live ? `threads answered, ${range}d` : "demo"} trend={live ? "up" : "flat"} />
           </div>
 
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card title="Threads per week" hint={live ? "last 8 weeks" : "last 8 weeks · demo"}>
               <BarChartCard data={live ? s!.threadsPerWeek : steamThreadsPerWeek} color="#34d399" />
             </Card>
             <Card title="Comments per week" hint={live ? "last 8 weeks" : "last 8 weeks · demo"}>
               <BarChartCard data={live ? s!.commentsPerWeek : steamCommentsPerWeek} color="#60a5fa" />
-            </Card>
-            <Card title="Sub-forum split" hint={live ? "active threads" : "demo"}>
-              <PieChartCard data={live && s!.subForumSplit.length > 0 ? s!.subForumSplit : steamSubForumSplit} />
             </Card>
 
             <Card title="Last 5 threads" hint={live ? "live" : "demo"}>
