@@ -83,38 +83,46 @@ export type ReviewRow = {
   mentionsBug: boolean;
 };
 
+// All date bucketing uses Kyiv time (server runs UTC), so weeks/days align with
+// what the team sees in Discord/Steam (Europe/Kyiv, UTC+3 in summer).
+const KYIV_OFFSET_MS = 3 * 60 * 60 * 1000;
+const kyiv = (ms: number) => new Date(ms + KYIV_OFFSET_MS);
+
 function fmt(d: Date) {
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  const k = kyiv(d.getTime());
+  return `${k.getUTCMonth() + 1}/${k.getUTCDate()}`;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function shortDate(iso: string | null | undefined) {
   if (!iso) return "";
-  const d = new Date(iso);
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  const k = kyiv(new Date(iso).getTime());
+  return `${k.getUTCDate()} ${MONTHS[k.getUTCMonth()]}`;
 }
 
 function weekBuckets(weeks: number, now: Date) {
-  // ISO-style calendar weeks: Monday 00:00 to Sunday 23:59.
-  const day = now.getDay();
-  const daysSinceMonday = day === 0 ? 6 : day - 1;
-  const currentMonday = new Date(now);
-  currentMonday.setDate(now.getDate() - daysSinceMonday);
-  currentMonday.setHours(0, 0, 0, 0);
+  // Calendar weeks Mon 00:00 → Sun 23:59 in Kyiv time. Boundaries stored as real
+  // UTC ms (aligned to Kyiv midnight) so item timestamps compare directly.
+  const nowK = kyiv(now.getTime());
+  const dow = nowK.getUTCDay();
+  const daysSinceMonday = dow === 0 ? 6 : dow - 1;
+  const mondayRealMs =
+    Date.UTC(nowK.getUTCFullYear(), nowK.getUTCMonth(), nowK.getUTCDate()) -
+    daysSinceMonday * 86400_000 -
+    KYIV_OFFSET_MS;
 
   const out: { label: string; startMs: number; endMs: number }[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
-    const start = new Date(currentMonday);
-    start.setDate(currentMonday.getDate() - i * 7);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-    const sameMonth = start.getMonth() === end.getMonth();
+    const startMs = mondayRealMs - i * 7 * 86400_000;
+    const endMs = startMs + 7 * 86400_000 - 1;
+    const ls = kyiv(startMs);
+    const le = kyiv(endMs);
+    const sameMonth = ls.getUTCMonth() === le.getUTCMonth();
     const label = sameMonth
-      ? `${MONTHS[start.getMonth()]} ${start.getDate()}–${end.getDate()}`
-      : `${MONTHS[start.getMonth()]} ${start.getDate()}–${MONTHS[end.getMonth()]} ${end.getDate()}`;
-    out.push({ label, startMs: start.getTime(), endMs: end.getTime() });
+      ? `${MONTHS[ls.getUTCMonth()]} ${ls.getUTCDate()}–${le.getUTCDate()}`
+      : `${MONTHS[ls.getUTCMonth()]} ${ls.getUTCDate()}–${MONTHS[le.getUTCMonth()]} ${le.getUTCDate()}`;
+    out.push({ label, startMs, endMs });
   }
   return out;
 }
