@@ -19,15 +19,25 @@ export async function getLatestInsights(): Promise<LatestInsights> {
       .eq("project_id", 1)
       .eq("csv_kind", "audience")
       .order("uploaded_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(12);
 
-    if (error || !data) {
+    if (error || !data || data.length === 0) {
       return { audience: null, audienceUploadedAt: null, hasDb: true };
     }
+
+    // Country / platform / tenure often arrive as separate files. Merge them:
+    // for each dimension take the newest upload that actually has it.
+    const merged: ParsedAudience = {};
+    for (const row of data) {
+      const a = (row.raw_data ?? {}) as ParsedAudience;
+      if (!merged.countries && a.countries?.length) merged.countries = a.countries;
+      if (!merged.devices && a.devices?.length) merged.devices = a.devices;
+      if (!merged.tenure && a.tenure?.length) merged.tenure = a.tenure;
+      if (!merged.newToDiscord && a.newToDiscord?.length) merged.newToDiscord = a.newToDiscord;
+    }
     return {
-      audience: data.raw_data as ParsedAudience,
-      audienceUploadedAt: data.uploaded_at,
+      audience: merged,
+      audienceUploadedAt: data[0].uploaded_at,
       hasDb: true,
     };
   } catch {

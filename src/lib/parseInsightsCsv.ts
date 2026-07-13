@@ -36,7 +36,12 @@ export type ParseResult = {
 export function detectCsvKind(filename: string, headerLine: string): CsvKind {
   const f = filename.toLowerCase();
   const h = headerLine.toLowerCase();
-  if (f.includes("audience") || h.includes("country") || h.includes("device")) return "audience";
+  // Discord exports: participators-by-reg-country / -platform / -guild-tenure.
+  if (
+    f.includes("audience") ||
+    f.includes("country") || f.includes("platform") || f.includes("tenure") ||
+    h.includes("country") || h.includes("device") || h.includes("platform") || h.includes("tenure")
+  ) return "audience";
   if (f.includes("growth") || h.includes("new_members") || h.includes("invite")) return "growth";
   if (f.includes("engagement") || h.includes("visitors") || h.includes("communicators")) return "engagement";
   return "unknown";
@@ -87,32 +92,29 @@ export function parseCsv(filename: string, text: string): ParseResult {
 function parseAudience(rows: string[][], header: string[]): ParsedAudience {
   const out: ParsedAudience = {};
   const countryIdx = header.findIndex((h) => h.includes("country"));
-  const deviceIdx = header.findIndex((h) => h.includes("device"));
-  const tenureIdx = header.findIndex((h) => h.includes("tenure") || h.includes("membership"));
+  const deviceIdx = header.findIndex((h) => h.includes("device") || h.includes("platform"));
+  const tenureIdx = header.findIndex((h) => (h.includes("tenure") || h.includes("membership")) && !h.includes("discord"));
   const newDiscordIdx = header.findIndex((h) => h.includes("discord_tenure") || h.includes("new_to_discord"));
-  const valueIdx = header.findIndex((h) => h.includes("percent") || h.includes("value") || h.includes("%"));
+  // Discord exports use "participators" as the count column.
+  const valueIdx = header.findIndex((h) => h.includes("participator") || h.includes("percent") || h.includes("value") || h.includes("count") || h.includes("members") || h.includes("%"));
+
+  // Aggregate by category name (handles multi-day exports with repeated categories).
+  const acc = (bucket: "countries" | "devices" | "tenure" | "newToDiscord", name: string, val: number) => {
+    const arr = (out[bucket] = out[bucket] ?? []);
+    const existing = arr.find((x) => x.name === name);
+    if (existing) existing.value += val;
+    else arr.push({ name, value: val });
+  };
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    const val = parseFloat(row[valueIdx] ?? row[1] ?? "0");
+    const val = parseFloat(valueIdx >= 0 ? row[valueIdx] : "");
     if (isNaN(val)) continue;
 
-    if (countryIdx >= 0 && row[countryIdx]) {
-      out.countries = out.countries ?? [];
-      out.countries.push({ name: row[countryIdx], value: val });
-    }
-    if (deviceIdx >= 0 && row[deviceIdx]) {
-      out.devices = out.devices ?? [];
-      out.devices.push({ name: row[deviceIdx], value: val });
-    }
-    if (tenureIdx >= 0 && row[tenureIdx]) {
-      out.tenure = out.tenure ?? [];
-      out.tenure.push({ name: row[tenureIdx], value: val });
-    }
-    if (newDiscordIdx >= 0 && row[newDiscordIdx]) {
-      out.newToDiscord = out.newToDiscord ?? [];
-      out.newToDiscord.push({ name: row[newDiscordIdx], value: val });
-    }
+    if (countryIdx >= 0 && row[countryIdx]) acc("countries", row[countryIdx], val);
+    if (deviceIdx >= 0 && row[deviceIdx]) acc("devices", row[deviceIdx], val);
+    if (tenureIdx >= 0 && row[tenureIdx]) acc("tenure", row[tenureIdx], val);
+    if (newDiscordIdx >= 0 && row[newDiscordIdx]) acc("newToDiscord", row[newDiscordIdx], val);
   }
   return out;
 }

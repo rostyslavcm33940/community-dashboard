@@ -241,7 +241,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <div className="text-sm uppercase tracking-wide text-zinc-500 mb-3">
               CSV Insights — manual upload, weekly
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <CsvUploadCard lastUploadAt={insights.audienceUploadedAt ?? undefined} />
               <Card
                 title="Countries"
@@ -254,6 +254,16 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                 hint={insights.audience?.devices ? "from CSV" : "mocked"}
               >
                 <PieChartCard data={devicesData} />
+              </Card>
+              <Card
+                title="Membership tenure"
+                hint={insights.audience?.tenure ? "from CSV" : "no data"}
+              >
+                {insights.audience?.tenure && insights.audience.tenure.length > 0 ? (
+                  <PieChartCard data={insights.audience.tenure} />
+                ) : (
+                  <div className="text-xs text-zinc-600">Upload the guild-tenure CSV to populate.</div>
+                )}
               </Card>
             </div>
           </div>
