@@ -25,6 +25,9 @@ const client = new Client({
 client.once("clientReady", async (c) => {
   console.log(`Backfill logged in as ${c.user.tag}`);
   const guild = await c.guilds.fetch(GUILD_ID);
+  // Fetch roles first — without this, member.roles.cache doesn't resolve role
+  // names for all members and role-based counts (e.g. Crow) come out too low.
+  await guild.roles.fetch();
 
   const channels = await guild.channels.fetch();
   const tracked = (ch) => ch && (TRACKED_CHANNEL_IDS.length === 0 || TRACKED_CHANNEL_IDS.includes(ch.id));

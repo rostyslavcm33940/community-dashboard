@@ -51,6 +51,7 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`Logged in as ${c.user.tag}`);
   const guild = await c.guilds.fetch(GUILD_ID);
   console.log(`Connected to: ${guild.name}`);
+  await guild.roles.fetch();
 
   const channels = await guild.channels.fetch();
   for (const [, ch] of channels) {
