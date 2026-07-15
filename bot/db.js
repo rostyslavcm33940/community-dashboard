@@ -55,8 +55,13 @@ export async function upsertMember(member) {
     ? user.displayAvatarURL({ size: 64, extension: "png" })
     : null;
 
+  // Resolve role names via the guild role cache by ID — member.roles.cache
+  // objects sometimes have unhydrated .name, which silently dropped roles (Crow).
+  const guildRoles = member.guild?.roles?.cache;
   const roleNames = member.roles?.cache
-    ? [...member.roles.cache.values()].map((r) => r.name).filter((n) => n && n !== "@everyone")
+    ? [...member.roles.cache.keys()]
+        .map((id) => guildRoles?.get(id)?.name ?? member.roles.cache.get(id)?.name)
+        .filter((n) => n && n !== "@everyone")
     : null;
   const hasCrow = roleNames?.some((n) => /crow/i.test(n)) ?? false;
 
@@ -137,9 +142,12 @@ export async function markLeftMembers(activeUserIds) {
   return gone.length;
 }
 
-// Store Discord's authoritative member count (guild.memberCount) for the KPI.
-export async function recordGuildStats(memberCount) {
-  await supabase.from("projects").update({ member_count: memberCount }).eq("id", PROJECT_ID);
+// Store Discord's authoritative counts for KPIs. crowCount comes from
+// role.members.size (reliable), sidestepping per-member role cache gaps.
+export async function recordGuildStats(memberCount, crowCount) {
+  const patch = { member_count: memberCount };
+  if (typeof crowCount === "number") patch.crow_count = crowCount;
+  await supabase.from("projects").update(patch).eq("id", PROJECT_ID);
 }
 
 export async function insertPresenceSnapshot(counts) {

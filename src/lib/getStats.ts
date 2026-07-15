@@ -223,7 +223,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("mentions_bug", true).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("timestamp_created, voted_up, mentions_bug").eq("project_id", 1).gte("timestamp_created", new Date(now.getTime() - 90 * 86400_000).toISOString()),
       supabase.from("mee6_leaderboard").select("username, xp, level, messages, taken_at").eq("project_id", 1).order("xp", { ascending: false }).limit(10),
-      supabase.from("projects").select("discord_guild_id, member_count").eq("id", 1).maybeSingle(),
+      supabase.from("projects").select("discord_guild_id, member_count, crow_count").eq("id", 1).maybeSingle(),
       supabase.from("steam_comments").select("created_at").eq("project_id", 1).gte("created_at", d56),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", true).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", false).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
@@ -568,7 +568,10 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       .slice(0, 10);
 
     const crowRows = (crowMembers ?? []) as { role_names: string[] | null; crow_since: string | null }[];
-    const crowCount = crowRows.filter((m) => m.role_names?.some((n) => /crow/i.test(n))).length;
+    // Authoritative crow count from Discord role.members.size (stored by bot).
+    // Falls back to row count if not yet populated.
+    const crowFromRows = crowRows.filter((m) => m.role_names?.some((n) => /crow/i.test(n))).length;
+    const crowCount = (projectRow as { crow_count?: number | null } | null)?.crow_count ?? crowFromRows;
     const newCrowsPerWeek = bucketByWeek(crowRows.filter((m) => m.crow_since).map((m) => ({ ts: m.crow_since })), buckets8w);
 
     return {

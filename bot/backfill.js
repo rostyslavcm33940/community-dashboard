@@ -44,9 +44,11 @@ client.once("clientReady", async (c) => {
   const leftCount = await markLeftMembers([...members.keys()]);
   console.log(`Marked ${leftCount} members as left`);
 
-  // Store Discord's authoritative member count for the KPI.
-  await recordGuildStats(guild.memberCount);
-  console.log(`Guild member count: ${guild.memberCount}`);
+  // Store Discord's authoritative counts. crow from role.members.size (reliable).
+  const crowRole = [...guild.roles.cache.values()].find((r) => /crow/i.test(r.name));
+  const crowCount = crowRole?.members.size ?? null;
+  await recordGuildStats(guild.memberCount, crowCount);
+  console.log(`Guild member count: ${guild.memberCount} | crow: ${crowCount}`);
 
   async function backfillTextChannel(ch, channelNameOverride) {
     console.log(`-- #${channelNameOverride ?? ch.name}`);
