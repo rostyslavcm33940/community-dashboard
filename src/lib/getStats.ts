@@ -344,8 +344,17 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     }
     const subForumSplit = Object.entries(sub).map(([name, value]) => ({ name, value }));
 
+    // Exclude our own (dev-authored) threads and deleted ones (not seen in the
+    // latest scrape) from community-facing metrics.
+    const isDevAuthor = (a: string | null | undefined) => /cm\.diana|rostyslav/i.test(a ?? "");
+    const latestSeen = Math.max(0, ...threads.map((t) => (t.last_seen_at ? new Date(t.last_seen_at).getTime() : 0)));
+    const seenCutoff = latestSeen - 6 * 3600_000;
+    const isLive = (t: { last_seen_at?: string | null }) => !latestSeen || !t.last_seen_at || new Date(t.last_seen_at).getTime() >= seenCutoff;
+    const isCommunityThread = (t: { author?: string | null; is_pinned?: boolean | null; last_seen_at?: string | null }) =>
+      !t.is_pinned && !isDevAuthor(t.author) && isLive(t);
+
     const newThreads7d = threads.filter((t) => t.created_at && new Date(t.created_at) > new Date(d30)).length;
-    const unansweredList = threads.filter((t) => (t.reply_count ?? 0) === 0 && !t.is_pinned && t.created_at && new Date(t.created_at) > new Date(d30));
+    const unansweredList = threads.filter((t) => (t.reply_count ?? 0) === 0 && isCommunityThread(t) && t.created_at && new Date(t.created_at) > new Date(d30));
     const unanswered = unansweredList.length;
     const noteByUrl = new Map<string, string>();
     for (const n of (threadNotes ?? []) as { thread_url: string; note: string | null }[]) {
@@ -393,7 +402,11 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       .eq("project_id", 1)
       .eq("is_dev_reply", true);
     const threadsWithDevReply = new Set((devReplyRows ?? []).map((r) => r.thread_id).filter((id) => id != null));
-    const threadsInRange = threads.filter((t) => t.created_at && new Date(t.created_at) > new Date(d30) && !t.is_pinned);
+    // Denominator: community threads created in range (excludes pinned, our own
+    // dev-authored threads, and deleted/gone threads).
+    const threadsInRange = threads.filter(
+      (t) => t.created_at && new Date(t.created_at) > new Date(d30) && isCommunityThread(t)
+    );
     const answeredByDev = threadsInRange.filter((t) => threadsWithDevReply.has(t.id)).length;
     const devResponsePct = threadsInRange.length > 0 ? Math.round((answeredByDev / threadsInRange.length) * 100) : 0;
 
