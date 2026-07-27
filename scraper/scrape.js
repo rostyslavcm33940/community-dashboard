@@ -135,9 +135,29 @@ async function insertComments(threadId, comments) {
 export async function scrape() {
   if (!FORUM_URL) throw new Error("STEAM_FORUM_URL is required");
   console.log(`Scraping ${FORUM_URL}`);
-  const html = await fetchHtml(FORUM_URL);
-  const { threads, subForums } = parseListingPage(html);
-  console.log(`Found ${threads.length} threads, ${subForums.length} sub-forums`);
+
+  // Paginate all forum pages so every existing thread is seen each run — this
+  // keeps last_seen_at fresh, which the dashboard uses to detect deletions.
+  const threads = [];
+  const seenUrls = new Set();
+  const MAX_PAGES = 15;
+  for (let p = 1; p <= MAX_PAGES; p++) {
+    const url = `${FORUM_URL}?fp=${p}`;
+    let pageThreads;
+    try {
+      const html = await fetchHtml(url);
+      pageThreads = parseListingPage(html).threads;
+    } catch (e) {
+      console.warn(`  page ${p} failed: ${e.message}`);
+      break;
+    }
+    const fresh = pageThreads.filter((t) => t.thread_url && !seenUrls.has(t.thread_url));
+    if (fresh.length === 0) break; // no new threads — end of forum
+    fresh.forEach((t) => { seenUrls.add(t.thread_url); threads.push(t); });
+    console.log(`  page ${p}: +${fresh.length} threads (total ${threads.length})`);
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  console.log(`Found ${threads.length} threads across pages`);
 
   for (const t of threads) {
     try {

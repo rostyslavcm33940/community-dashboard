@@ -341,7 +341,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     // falls behind the newest. Drop those (and anything gone) from ALL stats.
     const isDevAuthor = (a: string | null | undefined) => /cm\.diana|rostyslav/i.test(a ?? "");
     const latestSeen = Math.max(0, ...allThreads.map((t) => (t.last_seen_at ? new Date(t.last_seen_at).getTime() : 0)));
-    const seenCutoff = latestSeen - 3 * 3600_000; // ~3h grace for a missed scrape
+    const seenCutoff = latestSeen - 24 * 3600_000; // 24h grace — a thread must be gone a full day to count as deleted
     const isLive = (t: { last_seen_at?: string | null }) => !latestSeen || !t.last_seen_at || new Date(t.last_seen_at).getTime() >= seenCutoff;
     const isCommunityThread = (t: { author?: string | null; is_pinned?: boolean | null }) =>
       !t.is_pinned && !isDevAuthor(t.author);
