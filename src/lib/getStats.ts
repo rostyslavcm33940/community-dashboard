@@ -336,22 +336,24 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     }
     const newMembersPerDay = Object.entries(memberDayCounts).map(([date, value]) => ({ date, value }));
 
-    const threads = steamThreads ?? [];
+    const allThreads = steamThreads ?? [];
+    // A thread deleted from Steam stops appearing in scrapes, so its last_seen_at
+    // falls behind the newest. Drop those (and anything gone) from ALL stats.
+    const isDevAuthor = (a: string | null | undefined) => /cm\.diana|rostyslav/i.test(a ?? "");
+    const latestSeen = Math.max(0, ...allThreads.map((t) => (t.last_seen_at ? new Date(t.last_seen_at).getTime() : 0)));
+    const seenCutoff = latestSeen - 3 * 3600_000; // ~3h grace for a missed scrape
+    const isLive = (t: { last_seen_at?: string | null }) => !latestSeen || !t.last_seen_at || new Date(t.last_seen_at).getTime() >= seenCutoff;
+    const isCommunityThread = (t: { author?: string | null; is_pinned?: boolean | null }) =>
+      !t.is_pinned && !isDevAuthor(t.author);
+    // Live (not-deleted) threads — the base for every thread metric.
+    const threads = allThreads.filter(isLive);
+
     const sub: Record<string, number> = {};
     for (const t of threads) {
       const k = t.sub_forum ?? "General Discussions";
       sub[k] = (sub[k] ?? 0) + 1;
     }
     const subForumSplit = Object.entries(sub).map(([name, value]) => ({ name, value }));
-
-    // Exclude our own (dev-authored) threads and deleted ones (not seen in the
-    // latest scrape) from community-facing metrics.
-    const isDevAuthor = (a: string | null | undefined) => /cm\.diana|rostyslav/i.test(a ?? "");
-    const latestSeen = Math.max(0, ...threads.map((t) => (t.last_seen_at ? new Date(t.last_seen_at).getTime() : 0)));
-    const seenCutoff = latestSeen - 6 * 3600_000;
-    const isLive = (t: { last_seen_at?: string | null }) => !latestSeen || !t.last_seen_at || new Date(t.last_seen_at).getTime() >= seenCutoff;
-    const isCommunityThread = (t: { author?: string | null; is_pinned?: boolean | null; last_seen_at?: string | null }) =>
-      !t.is_pinned && !isDevAuthor(t.author) && isLive(t);
 
     const newThreads7d = threads.filter((t) => t.created_at && new Date(t.created_at) > new Date(d30)).length;
     const unansweredList = threads.filter((t) => (t.reply_count ?? 0) === 0 && isCommunityThread(t) && t.created_at && new Date(t.created_at) > new Date(d30));
@@ -524,7 +526,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       buckets8w
     );
     const membersFlowPerWeek = newMembersPerWeek.map((j, i) => ({ date: j.date, joined: j.value, left: leftPerWeek[i]?.value ?? 0 }));
-    const threadsPerWeek = bucketByWeek((steamThreads ?? []).map((t) => ({ ts: t.created_at })), buckets8w);
+    const threadsPerWeek = bucketByWeek(threads.map((t) => ({ ts: t.created_at })), buckets8w);
     const commentsPerWeek = bucketByWeek(((steamComments8w ?? []) as { created_at: string | null }[]).map((c) => ({ ts: c.created_at })), buckets8w);
 
     // QA track. bugReportsAll spans bug-reports + the Lobby thread (for the
