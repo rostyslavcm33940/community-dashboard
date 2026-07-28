@@ -162,7 +162,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               <BarChartCard data={live && d!.messagesByChannel.length > 0 ? d!.messagesByChannel : discordMessagesByChannel} horizontal color="#60a5fa" />
             </Card>
 
-            <Card title="Members joined vs left per week" hint={live ? "last 8 weeks · net growth" : "demo"}>
+            <Card title="Members joined vs left per week" hint={live ? "last 8 weeks · leaves tracked from Jul 9" : "demo"}>
               {live ? (
                 <MembersFlowChart data={d!.membersFlowPerWeek} />
               ) : (

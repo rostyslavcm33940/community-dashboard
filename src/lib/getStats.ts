@@ -212,7 +212,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("discord_messages").select("content, author_id, author_name, created_at, channel_name, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%sea-bugs%").order("created_at", { ascending: false }).limit(500),
       supabase.from("discord_messages").select("content, author_id, author_name, created_at, channel_name, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%your-ideas%").order("created_at", { ascending: false }).limit(500),
       Promise.resolve({ data: null }),
-      supabase.from("discord_members").select("joined_at").eq("project_id", 1).gte("joined_at", new Date(now.getTime() - Math.max(rangeDays, 56) * 86400_000).toISOString()),
+      paginate<{ joined_at: string | null }>((from, to) => supabase.from("discord_members").select("joined_at").eq("project_id", 1).gte("joined_at", new Date(now.getTime() - Math.max(rangeDays, 56) * 86400_000).toISOString()).range(from, to)).then((data) => ({ data, error: null })),
       supabase.from("steam_threads").select("*").eq("project_id", 1).order("created_at", { ascending: false }),
       supabase.from("steam_comments").select("content, author, created_at, is_dev_reply, comment_url").eq("project_id", 1).order("created_at", { ascending: false }).limit(5),
       supabase.from("steam_threads").select("title, reply_count, author").eq("project_id", 1).eq("is_pinned", true),
