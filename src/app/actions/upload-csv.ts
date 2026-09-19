@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { serverClient } from "@/lib/supabase/server";
 import { parseCsv } from "@/lib/parseInsightsCsv";
 
@@ -37,6 +37,7 @@ export async function uploadInsightsCsv(formData: FormData): Promise<UploadResul
       count++;
     }
 
+    revalidateTag("dashboard-insights", "max");
     revalidatePath("/");
     return { ok: true, kind: lastKind, count };
   } catch (e) {

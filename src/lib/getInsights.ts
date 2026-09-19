@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { serverClient } from "./supabase/server";
 import type { ParsedAudience } from "./parseInsightsCsv";
 
@@ -7,7 +8,16 @@ export type LatestInsights = {
   hasDb: boolean;
 };
 
-export async function getLatestInsights(): Promise<LatestInsights> {
+// Pulls up to 12 raw CSV blobs; they only change on a manual upload, so cache
+// them instead of re-fetching on every (force-dynamic) page request.
+export function getLatestInsights(): Promise<LatestInsights> {
+  return unstable_cache(computeLatestInsights, ["dashboard-insights"], {
+    revalidate: 3600,
+    tags: ["dashboard-insights"],
+  })();
+}
+
+async function computeLatestInsights(): Promise<LatestInsights> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return { audience: null, audienceUploadedAt: null, hasDb: false };
   }

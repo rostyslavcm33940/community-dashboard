@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { serverClient } from "./supabase/server";
 
 export type DashboardStats = {
@@ -156,7 +157,20 @@ async function paginate<T>(makeQuery: (from: number, to: number) => PromiseLike<
   return out;
 }
 
-export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats | null> {
+// Every page request used to re-run the ~30 queries below (page is force-dynamic),
+// so a handful of reloads or a crawler pass burned the Supabase egress quota.
+// Stats change at most once per scraper run, so serve them from cache.
+export const STATS_TTL_SECONDS = 900;
+
+export function getDashboardStats(rangeDays = 30): Promise<DashboardStats | null> {
+  return unstable_cache(
+    () => computeDashboardStats(rangeDays),
+    ["dashboard-stats", String(rangeDays)],
+    { revalidate: STATS_TTL_SECONDS, tags: ["dashboard-stats"] }
+  )();
+}
+
+async function computeDashboardStats(rangeDays = 30): Promise<DashboardStats | null> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
     return null;
   }
@@ -209,8 +223,8 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("discord_messages").select("id, channel_name, created_at, message_id, channel_id").eq("project_id", 1).gte("created_at", d56).ilike("channel_name", "%your-ideas%"),
       paginate<{ channel_name: string | null; author_id: string | null; author_name: string | null; created_at: string | null; reaction_count: number | null }>((from, to) => supabase.from("discord_messages").select("channel_name, author_id, author_name, created_at, reaction_count").eq("project_id", 1).gte("created_at", d30).not("channel_name", "ilike", "%moderator%").range(from, to)).then((data) => ({ data, error: null })),
       Promise.resolve({ data: null }),
-      supabase.from("discord_messages").select("content, author_id, author_name, created_at, channel_name, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%sea-bugs%").order("created_at", { ascending: false }).limit(500),
-      supabase.from("discord_messages").select("content, author_id, author_name, created_at, channel_name, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%your-ideas%").order("created_at", { ascending: false }).limit(500),
+      supabase.from("discord_messages").select("content, author_id, author_name, created_at, channel_name, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%sea-bugs%").order("created_at", { ascending: false }).limit(200),
+      supabase.from("discord_messages").select("content, author_id, author_name, created_at, channel_name, message_id, channel_id").eq("project_id", 1).ilike("channel_name", "%your-ideas%").order("created_at", { ascending: false }).limit(200),
       Promise.resolve({ data: null }),
       paginate<{ joined_at: string | null }>((from, to) => supabase.from("discord_members").select("joined_at").eq("project_id", 1).gte("joined_at", new Date(now.getTime() - Math.max(rangeDays, 56) * 86400_000).toISOString()).range(from, to)).then((data) => ({ data, error: null })),
       supabase.from("steam_threads").select("*").eq("project_id", 1).order("created_at", { ascending: false }),
@@ -228,7 +242,9 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", true).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("steam_reviews").select("content, language, voted_up, timestamp_created, review_url, mentions_bug, votes_up").eq("project_id", 1).eq("voted_up", false).gte("timestamp_created", new Date(now.getTime() - 30 * 86400_000).toISOString()).order("votes_up", { ascending: false }).order("timestamp_created", { ascending: false }).limit(5),
       supabase.from("system_runs").select("source, ran_at").order("ran_at", { ascending: false }).limit(50),
-      supabase.from("discord_messages").select("id, created_at, message_id, channel_id, author_id, author_name, channel_name, content").eq("project_id", 1).or("channel_name.ilike.%bug-reports%,channel_name.ilike.%lobby%").order("created_at", { ascending: false }).limit(3000),
+      // Counters/top-lists only need metadata — pulling `content` for 3000 rows
+      // was megabytes of egress per refresh. Text comes from the small query below.
+      supabase.from("discord_messages").select("id, created_at, message_id, channel_id, author_id, author_name, channel_name").eq("project_id", 1).or("channel_name.ilike.%bug-reports%,channel_name.ilike.%lobby%").order("created_at", { ascending: false }).limit(3000),
       supabase.from("discord_members").select("role_names, crow_since").eq("project_id", 1).is("left_at", null).not("role_names", "is", null),
       supabase.from("discord_members").select("left_at").eq("project_id", 1).gte("left_at", new Date(now.getTime() - Math.max(rangeDays, 56) * 86400_000).toISOString()),
       supabase.from("steam_thread_notes").select("thread_url, note").eq("project_id", 1),
@@ -531,7 +547,7 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
 
     // QA track. bugReportsAll spans bug-reports + the Lobby thread (for the
     // "most active" metric). Bug-report counts use the bug-reports channel only.
-    type BugRow = { created_at: string | null; message_id: string | null; channel_id: string | null; author_id: string | null; author_name: string | null; channel_name: string | null; content: string | null };
+    type BugRow = { created_at: string | null; message_id: string | null; channel_id: string | null; author_id: string | null; author_name: string | null; channel_name: string | null };
     const qaRows = (bugReportsAll ?? []) as BugRow[];
     const bugRows = qaRows.filter((r) => /bug-reports/i.test(r.channel_name ?? ""));
     const bugReportStarters = bugRows.filter((r) => r.message_id && r.channel_id && r.message_id === r.channel_id);
@@ -539,10 +555,24 @@ export async function getDashboardStats(rangeDays = 30): Promise<DashboardStats 
     const bugReportsInRange = bugReportStarters.filter((r) => r.created_at && new Date(r.created_at).getTime() >= dRangeMs).length;
 
     // Latest 5 bug reports (thread starters), newest first, with Discord deep-link.
+    // Only this short window carries `content`; starters can't be filtered in
+    // PostgREST (no column-to-column compare), so we narrow by recency instead.
+    const { data: bugReportTexts } = await supabase
+      .from("discord_messages")
+      .select("message_id, content")
+      .eq("project_id", 1)
+      .ilike("channel_name", "%bug-reports%")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const bugTextById = new Map<string, string>();
+    for (const r of (bugReportTexts ?? []) as { message_id: string; content: string | null }[]) {
+      if (r.message_id) bugTextById.set(r.message_id, r.content ?? "");
+    }
+
     const latestBugReports = bugReportStarters.slice(0, 5).map((m) => {
       const res = resolveByAuthor(m.author_id, m.author_name);
       return {
-        title: (m.content ?? "").slice(0, 80) || "(no text)",
+        title: (bugTextById.get(m.message_id ?? "") ?? "").slice(0, 80) || "(no text)",
         author: res.name,
         at: shortDate(m.created_at),
         href: discordUrl(m.channel_id, m.message_id),

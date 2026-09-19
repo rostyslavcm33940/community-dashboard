@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { Client, GatewayIntentBits, ChannelType } from "discord.js";
-import { upsertChannel, upsertMember, insertMessage, recordSystemRun, markLeftMembers, recordGuildStats } from "./db.js";
+import { upsertChannel, upsertMember, insertMessage, recordSystemRun, markLeftMembers, recordGuildStats, fetchExistingMembers } from "./db.js";
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
@@ -11,6 +11,18 @@ const TRACKED_CHANNEL_IDS = (process.env.TRACKED_CHANNEL_IDS || "")
 
 const FETCH_BATCH = 100;
 const MAX_PER_CHANNEL = parseInt(process.env.BACKFILL_LIMIT || "5000", 10);
+
+// Unattended cron job: log problems as warnings and exit 0 so a broken Discord
+// token / restricted DB doesn't turn into a stream of "run failed" mail. A
+// missing fresh `system_runs` row is the signal that data went stale.
+function softExit(label) {
+  return (err) => {
+    console.error(`::warning::Discord backfill ${label}:`, err?.message ?? err);
+    process.exit(0);
+  };
+}
+process.on("unhandledRejection", softExit("unhandled rejection"));
+process.on("uncaughtException", softExit("uncaught exception"));
 
 const client = new Client({
   intents: [
@@ -37,7 +49,8 @@ client.once("clientReady", async (c) => {
   console.log(`Backfilling ${textChannels.length} text + ${forumChannels.length} forum channels (limit ${MAX_PER_CHANNEL}/channel)`);
 
   const members = await guild.members.fetch();
-  for (const [, m] of members) await upsertMember(m);
+  const existingById = await fetchExistingMembers();
+  for (const [, m] of members) await upsertMember(m, existingById.get(m.id) ?? null);
   console.log(`Synced ${members.size} members`);
 
   // Members no longer present have left — mark them (backfill has no live leave events).
@@ -109,4 +122,4 @@ client.once("clientReady", async (c) => {
   process.exit(0);
 });
 
-client.login(TOKEN);
+client.login(TOKEN).catch(softExit("login failed"));

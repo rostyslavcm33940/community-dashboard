@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { serverClient } from "@/lib/supabase/server";
 
 export type SaveNoteResult = { ok: true } | { ok: false; error: string };
@@ -16,6 +16,7 @@ export async function saveThreadNote(threadUrl: string, note: string): Promise<S
         { onConflict: "project_id,thread_url" }
       );
     if (error) return { ok: false, error: error.message };
+    revalidateTag("dashboard-stats", "max");
     revalidatePath("/");
     return { ok: true };
   } catch (e) {

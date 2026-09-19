@@ -44,7 +44,28 @@ export async function upsertChannel(channel) {
   );
 }
 
-export async function upsertMember(member) {
+// One read for the whole guild instead of one per member — the backfill syncs
+// 1000+ members every run, which meant 1000+ round trips against Supabase.
+export async function fetchExistingMembers() {
+  const byId = new Map();
+  const pageSize = 1000;
+  for (let page = 0; page < 100; page++) {
+    const { data, error } = await supabase
+      .from("discord_members")
+      .select("user_id, crow_since, role_names")
+      .eq("project_id", PROJECT_ID)
+      .range(page * pageSize, page * pageSize + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    for (const row of data) byId.set(row.user_id, row);
+    if (data.length < pageSize) break;
+  }
+  return byId;
+}
+
+// `knownExisting` is the row from fetchExistingMembers(); omit it (live bot,
+// single member) and the row is fetched on demand.
+export async function upsertMember(member, knownExisting) {
   const accountCreated = new Date(
     Number((BigInt(member.id) >> 22n) + 1420070400000n)
   ).toISOString();
@@ -65,12 +86,15 @@ export async function upsertMember(member) {
     : null;
   const hasCrow = roleNames?.some((n) => /crow/i.test(n)) ?? false;
 
-  const { data: existing } = await supabase
-    .from("discord_members")
-    .select("crow_since, role_names")
-    .eq("project_id", PROJECT_ID)
-    .eq("user_id", member.id)
-    .maybeSingle();
+  let existing = knownExisting;
+  if (existing === undefined) {
+    ({ data: existing } = await supabase
+      .from("discord_members")
+      .select("crow_since, role_names")
+      .eq("project_id", PROJECT_ID)
+      .eq("user_id", member.id)
+      .maybeSingle());
+  }
 
   const joinedAt = member.joinedAt?.toISOString() ?? null;
 

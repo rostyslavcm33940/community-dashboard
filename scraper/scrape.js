@@ -122,14 +122,13 @@ async function upsertThread(t, createdAt, subForum) {
 
 async function insertComments(threadId, comments) {
   if (!threadId || comments.length === 0) return;
-  for (const c of comments) {
-    await supabase
-      .from("steam_comments")
-      .upsert(
-        { ...c, project_id: PROJECT_ID, thread_id: threadId },
-        { onConflict: "comment_url" }
-      );
-  }
+  // One request per thread instead of one per comment — the per-comment loop meant
+  // tens of thousands of round trips a day against Supabase.
+  const rows = comments.map((c) => ({ ...c, project_id: PROJECT_ID, thread_id: threadId }));
+  const { error } = await supabase
+    .from("steam_comments")
+    .upsert(rows, { onConflict: "comment_url" });
+  if (error) throw error;
 }
 
 export async function scrape() {
@@ -177,8 +176,11 @@ export async function scrape() {
 
 import { pathToFileURL } from "url";
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  // Exit 0 even on failure: this is an unattended cron job and a red run only
+  // produces notification mail. Staleness is visible on the dashboard via
+  // `system_runs` (no fresh row = the job didn't complete).
   scrape().catch((e) => {
-    console.error(e);
-    process.exit(1);
+    console.error("::warning::Steam scrape failed:", e?.message ?? e);
+    process.exit(0);
   });
 }

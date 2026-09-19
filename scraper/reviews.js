@@ -144,8 +144,9 @@ export async function fetchAllReviews() {
 }
 
 if (import.meta.url === (await import("url")).pathToFileURL(process.argv[1]).href) {
+  // See scrape.js — unattended cron, failures are logged as warnings, never red.
   fetchAllReviews().catch((e) => {
-    console.error(e);
-    process.exit(1);
+    console.error("::warning::Steam reviews failed:", e?.message ?? e);
+    process.exit(0);
   });
 }
