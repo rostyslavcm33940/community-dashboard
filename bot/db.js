@@ -149,6 +149,35 @@ export async function recordSystemRun(source) {
   await supabase.from("system_runs").insert({ source });
 }
 
+// The GitHub `schedule:` cron and cron-job.org both trigger the backfill, so runs
+// arrive far more often than the data changes — and a full re-backfill of every
+// channel is the single most expensive thing we do against Supabase. Gate on the
+// last completed run rather than on the trigger. Any error means "run", so a
+// throttle problem can never be what hides a real one.
+export async function shouldRun(source, minMinutes) {
+  if (process.env.FORCE_RUN === "1") return true;
+  try {
+    const { data, error } = await supabase
+      .from("system_runs")
+      .select("ran_at")
+      .eq("source", source)
+      .order("ran_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data?.ran_at) return true;
+    const ageMinutes = (Date.now() - new Date(data.ran_at).getTime()) / 60000;
+    if (ageMinutes < minMinutes) {
+      console.log(
+        `Skipping ${source}: last run was ${Math.round(ageMinutes)}m ago (min interval ${minMinutes}m).`
+      );
+      return false;
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 // Mark members who are no longer in the guild as left. Called after a full member
 // sync: any tracked member (left_at null) not in the current guild set has left.
 export async function markLeftMembers(activeUserIds) {

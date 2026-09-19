@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
+import { shouldRun } from "./throttle.js";
 
 const PROJECT_ID = parseInt(process.env.PROJECT_ID || "1", 10);
 const APP_ID = process.env.STEAM_REVIEWS_APP_ID || process.env.STEAM_APP_ID || "4317790";
@@ -105,6 +106,7 @@ async function upsertReviews(reviews) {
 }
 
 export async function fetchAllReviews() {
+  if (!(await shouldRun("steam_reviews", 55))) return 0;
   console.log(`Fetching Steam reviews for app ${APP_ID}`);
   let cursor = "*";
   let total = 0;

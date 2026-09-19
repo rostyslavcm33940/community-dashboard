@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { Client, GatewayIntentBits, ChannelType } from "discord.js";
-import { upsertChannel, upsertMember, insertMessage, recordSystemRun, markLeftMembers, recordGuildStats, fetchExistingMembers } from "./db.js";
+import { upsertChannel, upsertMember, insertMessage, recordSystemRun, markLeftMembers, recordGuildStats, fetchExistingMembers, shouldRun } from "./db.js";
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
@@ -122,4 +122,9 @@ client.once("clientReady", async (c) => {
   process.exit(0);
 });
 
-client.login(TOKEN).catch(softExit("login failed"));
+// Checked before connecting to Discord, so a throttled run costs nothing at all.
+if (await shouldRun("discord_backfill", 355)) {
+  client.login(TOKEN).catch(softExit("login failed"));
+} else {
+  process.exit(0);
+}

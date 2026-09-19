@@ -1,6 +1,7 @@
 import "dotenv/config";
 import * as cheerio from "cheerio";
 import { createClient } from "@supabase/supabase-js";
+import { shouldRun } from "./throttle.js";
 
 const PROJECT_ID = parseInt(process.env.PROJECT_ID || "1", 10);
 const FORUM_URL = process.env.STEAM_FORUM_URL;
@@ -133,6 +134,7 @@ async function insertComments(threadId, comments) {
 
 export async function scrape() {
   if (!FORUM_URL) throw new Error("STEAM_FORUM_URL is required");
+  if (!(await shouldRun("steam_scraper", 55))) return;
   console.log(`Scraping ${FORUM_URL}`);
 
   // Paginate all forum pages so every existing thread is seen each run — this
